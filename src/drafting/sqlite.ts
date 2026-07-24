@@ -1,17 +1,21 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import type { Material } from "../contracts.ts";
+import { renderDraftBrief, renderDraftTask } from "./brief.ts";
 import type {
   DraftApplication,
   DraftFinishReceipt,
-  DraftMaterialHint,
   DraftStartReceipt,
   DraftStartRequest,
 } from "./port.ts";
 import { DraftOperationError } from "./port.ts";
+import {
+  selectCore,
+  type DraftCoreMessage,
+  type SelectedCore,
+} from "./selection.ts";
 
 const configurationVersion = "draft-brief-v1";
-const maximumCoreExamples = 4;
 
 type StoredProfile = {
   id: number;
@@ -26,16 +30,6 @@ type StoredCore = {
   tags_json: string;
   pinned: number;
   accepted_at: string;
-};
-
-type SelectedCore = {
-  id: string;
-  text: string;
-  tags: string[];
-  materials: Array<
-    Pick<Material, "ordinal" | "kind" | "role" | "label">
-  >;
-  pinned: boolean;
 };
 
 type StoredRun = {
@@ -223,13 +217,21 @@ export class SqliteDraftApplication implements DraftApplication {
     );
   }
 
-  #coreMessages(): StoredCore[] {
-    return this.#database
+  #coreMessages(): DraftCoreMessage[] {
+    const rows = this.#database
       .prepare(`
         SELECT id, text, materials_json, tags_json, pinned, accepted_at
         FROM core_messages
       `)
       .all() as unknown as StoredCore[];
+    return rows.map((row) => ({
+      id: row.id,
+      text: row.text,
+      tags: JSON.parse(row.tags_json) as string[],
+      materials: JSON.parse(row.materials_json) as Material[],
+      pinned: row.pinned === 1,
+      acceptedAt: row.accepted_at,
+    }));
   }
 
   #prepareBrief(request: DraftStartRequest): {
@@ -271,258 +273,6 @@ export class SqliteDraftApplication implements DraftApplication {
   }
 }
 
-function selectCore(
-  rows: StoredCore[],
-  request: DraftStartRequest,
-): SelectedCore[] {
-  const intent = [
-    request.objective,
-    request.audience,
-    request.situation,
-    ...request.constraints,
-    request.destination,
-    request.thread,
-    ...request.currentMaterials.map((material) =>
-      [material.kind, material.role, material.description]
-        .filter(Boolean)
-        .join(" "),
-    ),
-  ]
-    .filter((value): value is string => value !== undefined)
-    .join(" ");
-  const terms = new Set(
-    intent
-      .toLocaleLowerCase("en")
-      .match(/[\p{L}\p{N}]+/gu)
-      ?.filter((term) => term.length >= 3 && !stopWords.has(term)) ?? [],
-  );
-  const desiredTags = inferDesiredTags(intent, request.currentMaterials);
-  const desiredMaterialKinds = new Set(
-    request.currentMaterials.map((material) => material.kind),
-  );
-  const desiredMaterialRoles = new Set(
-    request.currentMaterials
-      .map((material) => material.role)
-      .filter((role): role is NonNullable<DraftMaterialHint["role"]> =>
-        role !== undefined,
-      ),
-  );
-
-  return rows
-    .map((row) => {
-      const tags = JSON.parse(row.tags_json) as string[];
-      const materials = (
-        JSON.parse(row.materials_json) as Material[]
-      ).map((material) => ({
-        ordinal: material.ordinal,
-        kind: material.kind,
-        role: material.role,
-        ...(material.label === undefined ? {} : { label: material.label }),
-      }));
-      const messageTerms = new Set(
-        row.text.toLocaleLowerCase("en").match(/[\p{L}\p{N}]+/gu) ?? [],
-      );
-      const tagScore =
-        tags.filter((tag) => desiredTags.has(tag)).length * 20;
-      const lexicalScore =
-        [...terms].filter((term) => messageTerms.has(term)).length * 2;
-      const materialScore = materials.reduce(
-        (total, material) =>
-          total +
-          (desiredMaterialKinds.has(material.kind) ? 6 : 0) +
-          (desiredMaterialRoles.has(material.role) ? 4 : 0),
-        0,
-      );
-      return {
-        selected: {
-          id: String(row.id),
-          text: row.text,
-          tags,
-          materials,
-          pinned: row.pinned === 1,
-        },
-        score:
-          tagScore +
-          lexicalScore +
-          materialScore +
-          (row.pinned === 1 ? 5 : 0),
-        acceptedAt: row.accepted_at,
-        numericId: row.id,
-      };
-    })
-    .sort(
-      (left, right) =>
-        right.score - left.score ||
-        Number(right.selected.pinned) - Number(left.selected.pinned) ||
-        right.acceptedAt.localeCompare(left.acceptedAt) ||
-        right.numericId - left.numericId,
-    )
-    .slice(0, maximumCoreExamples)
-    .map((item) => item.selected);
-}
-
-function inferDesiredTags(
-  intent: string,
-  materials: DraftMaterialHint[],
-): Set<string> {
-  const tags = new Set<string>();
-  if (/\b(explain|explanation|because|why)\b/i.test(intent)) {
-    tags.add("explanation");
-  }
-  if (/[?]|\b(ask|question|whether|confirm|verify)\b/i.test(intent)) {
-    tags.add("question");
-  }
-  if (/\b(disagree|disagreement|push back|not convinced)\b/i.test(intent)) {
-    tags.add("disagreement");
-  }
-  if (/\b(request|ask|please|can you|could you)\b/i.test(intent)) {
-    tags.add("request");
-  }
-  if (
-    /\b(link|linked|url)\b/i.test(intent) ||
-    materials.some((material) => material.kind === "link")
-  ) {
-    tags.add("link");
-  }
-  if (
-    /\b(evidence|screenshot|image)\b/i.test(intent) ||
-    materials.some(
-      (material) =>
-        material.kind === "image" || material.role === "evidence",
-    )
-  ) {
-    tags.add("evidence");
-  }
-  return tags;
-}
-
-function renderDraftBrief(input: {
-  request: DraftStartRequest;
-  profileText: string;
-  profileStatus: "current" | "stale";
-  selectedCore: SelectedCore[];
-}): string {
-  const examples = input.selectedCore.flatMap((message, index) => {
-    const materialLines =
-      message.materials.length === 0
-        ? ["- Historical Material patterns: none."]
-        : [
-            "- Historical Material patterns:",
-            ...message.materials.map(
-              (material) =>
-                `  - ${material.ordinal}. ${inline(material.kind)} / ${inline(material.role)}${
-                  material.label ? ` / ${inline(material.label)}` : ""
-                }`,
-            ),
-          ];
-    return [
-      `### Example ${index + 1}`,
-      `- Tags: ${message.tags.length === 0 ? "none" : message.tags.map(inline).join(", ")}`,
-      ...materialLines,
-      "",
-      quote(message.text),
-      "",
-    ];
-  });
-
-  return [
-    renderDraftTask(input.request),
-    "",
-    "## Voice Evidence",
-    "",
-    "Use the evidence below to preserve the demonstrated voice.",
-    "",
-    "## Voice Profile",
-    "",
-    `- Profile status: ${capitalize(input.profileStatus)}`,
-    "",
-    input.profileText,
-    "",
-    "## Relevant Core Messages",
-    "",
-    "Only the examples below are voice evidence for this Draft Run.",
-    "",
-    ...examples,
-  ].join("\n");
-}
-
-function renderDraftTask(request: DraftStartRequest): string {
-  const situation = [
-    field("Audience", request.audience),
-    field("Situation", request.situation),
-    field("Destination", request.destination),
-    field("Thread", request.thread),
-  ].filter((value): value is string => value !== null);
-  const constraints =
-    request.constraints.length === 0
-      ? ["- None supplied."]
-      : request.constraints.map((constraint) => `- ${inline(constraint)}`);
-  const currentMaterials =
-    request.currentMaterials.length === 0
-      ? ["- None supplied."]
-      : request.currentMaterials.map((material, index) => {
-          const details = [
-            material.kind,
-            material.role,
-            material.description,
-          ].filter(Boolean);
-          return `- ${index + 1}. ${details.map((value) => inline(value!)).join(" — ")}`;
-        });
-  return [
-    "# Draft Brief",
-    "",
-    "Write one proposed Slack message. Improve accidental ambiguity, grammar, and unintended harshness.",
-    "",
-    "## Objective",
-    "",
-    request.objective,
-    "",
-    "## Situation",
-    "",
-    ...(situation.length === 0 ? ["- None supplied."] : situation),
-    "",
-    "### Constraints",
-    "",
-    ...constraints,
-    "",
-    "### Current Materials",
-    "",
-    "These describe the current situation. They are not voice evidence.",
-    "",
-    ...currentMaterials,
-  ].join("\n");
-}
-
-function field(label: string, value: string | undefined): string | null {
-  return value === undefined ? null : `- ${label}: ${inline(value)}`;
-}
-
-function inline(value: string): string {
-  return value.replaceAll(/\s+/g, " ").trim();
-}
-
-function quote(value: string): string {
-  return value.split(/\r?\n/).map((line) => `> ${line}`).join("\n");
-}
-
-function capitalize(value: string): string {
-  return `${value[0]!.toUpperCase()}${value.slice(1)}`;
-}
-
 function hash(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
-
-const stopWords = new Set([
-  "and",
-  "are",
-  "for",
-  "from",
-  "into",
-  "one",
-  "that",
-  "the",
-  "this",
-  "with",
-  "write",
-]);
