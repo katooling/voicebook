@@ -6,6 +6,7 @@ import { runImportCommand } from "./commands/import.ts";
 import { runProfileCommand } from "./commands/profile.ts";
 import { runReviewCommand } from "./commands/review.ts";
 import { runSyncCommand } from "./commands/sync.ts";
+import { runExportCommand } from "./commands/export.ts";
 
 async function main(): Promise<void> {
   const [command, ...args] = process.argv.slice(2);
@@ -24,9 +25,12 @@ async function main(): Promise<void> {
     case "sync":
       await runSyncCommand({ args, workspace });
       return;
+    case "export":
+      await runExportCommand({ args, workspace });
+      return;
     default:
       fail(
-        "Usage: voicebook <import|profile|review|sync> [--workspace PATH].",
+        "Usage: voicebook <export|import|profile|review|sync> [--workspace PATH].",
       );
   }
 }
