@@ -64,6 +64,7 @@ export function renderCore(input: {
                   <p>${message.tags.length === 0 ? "No contextual tags." : message.tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join(" ")}</p>
                   <form method="post" action="/core/${encodeURIComponent(message.id)}/tags">
                     <input type="hidden" name="csrf" value="${escapeHtml(input.csrfToken)}">
+                    <input type="hidden" name="expectedTagsJson" value="${escapeHtml(message.expectedTagsJson)}">
                     <label for="core-tags-${escapeHtml(message.id)}">Edit context</label>
                     <div>
                       <input id="core-tags-${escapeHtml(message.id)}" name="tags" value="${escapeHtml(message.tags.join(", "))}" aria-describedby="core-tags-help-${escapeHtml(message.id)}">

@@ -6,6 +6,7 @@ import type {
   SuggestedQueue,
   TaggedCoreMessage,
 } from "./port.ts";
+import { CoreTagsChangedError } from "./port.ts";
 import type { AnalyzedCandidate, ContextualTag } from "./analysis.ts";
 import type { CoreMessage } from "../core/port.ts";
 
@@ -89,21 +90,48 @@ export class SqliteQueueApplication implements QueueApplication {
       tags_json: string;
     }>;
     const tagsById = new Map(
-      rows.map((row) => [String(row.id), JSON.parse(row.tags_json) as string[]]),
+      rows.map((row) => [
+        String(row.id),
+        {
+          tags: JSON.parse(row.tags_json) as string[],
+          expectedTagsJson: row.tags_json,
+        },
+      ]),
     );
     return coreMessages.map((message) => ({
       ...message,
-      tags: tagsById.get(message.id) ?? [],
+      tags: tagsById.get(message.id)?.tags ?? [],
+      expectedTagsJson:
+        tagsById.get(message.id)?.expectedTagsJson ?? JSON.stringify([]),
     }));
   }
 
-  updateCoreTags(coreMessageId: string, tags: string[]): void {
+  updateCoreTags(
+    coreMessageId: string,
+    expectedTagsJson: string,
+    tags: string[],
+  ): void {
     const normalizedTags = normalizeTagInput(tags);
+    const nextTagsJson = JSON.stringify(normalizedTags);
+    const id = parseIdentifier(coreMessageId);
     const result = this.#database
-      .prepare("UPDATE core_messages SET tags_json = ? WHERE id = ?")
-      .run(JSON.stringify(normalizedTags), parseIdentifier(coreMessageId));
-    if (result.changes !== 1) {
+      .prepare(`
+        UPDATE core_messages
+        SET tags_json = ?
+        WHERE id = ? AND tags_json = ? AND tags_json <> ?
+      `)
+      .run(nextTagsJson, id, expectedTagsJson, nextTagsJson);
+    if (result.changes === 1) {
+      return;
+    }
+    const current = this.#database
+      .prepare("SELECT tags_json FROM core_messages WHERE id = ?")
+      .get(id) as { tags_json: string } | undefined;
+    if (!current) {
       throw new Error("Core Message was not found.");
+    }
+    if (current.tags_json !== expectedTagsJson) {
+      throw new CoreTagsChangedError();
     }
   }
 }

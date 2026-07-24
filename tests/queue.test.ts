@@ -190,3 +190,63 @@ test("queue suggestions and tags stored on acceptance stay in parity", async () 
     await rm(workspace, { recursive: true, force: true });
   }
 });
+
+test("stale Core tag correction cannot overwrite a newer correction", async () => {
+  const workspace = await mkdtemp(join(tmpdir(), "voicebook-stale-tags-"));
+  const fixture = JSON.parse(
+    await readFile(queueFixturePath, "utf8"),
+  ) as ImportEnvelope;
+  importEnvelope(workspace, fixture);
+  const server = await startVoicebook(workspace);
+  const browser = await chromium.launch({ headless: true });
+
+  try {
+    const firstPage = await browser.newPage();
+    await firstPage.goto(
+      `${server.origin}/?q=${encodeURIComponent("callback marker before changing")}`,
+    );
+    await firstPage
+      .getByRole("button", { name: "Accept", exact: true })
+      .click();
+    await firstPage.goto(`${server.origin}/core`);
+
+    const secondPage = await browser.newPage();
+    await secondPage.goto(`${server.origin}/core`);
+    assert.equal(
+      await firstPage.getByLabel("Edit context").inputValue(),
+      "question",
+    );
+    assert.equal(
+      await secondPage.getByLabel("Edit context").inputValue(),
+      "question",
+    );
+
+    await firstPage.getByLabel("Edit context").fill("clarification");
+    await firstPage.getByRole("button", { name: "Save tags" }).click();
+    await firstPage.getByText("clarification", { exact: true }).waitFor();
+
+    await secondPage.getByLabel("Edit context").fill("stale-overwrite");
+    const staleResponse = secondPage.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        response.url().endsWith("/core/1/tags"),
+    );
+    await secondPage.getByRole("button", { name: "Save tags" }).click();
+    assert.equal((await staleResponse).status(), 409);
+    await secondPage
+      .getByText(
+        "Core Message tags changed. Refresh before saving your correction.",
+      )
+      .waitFor();
+
+    await firstPage.goto(`${server.origin}/core`);
+    assert.deepEqual(
+      await firstPage.locator(".contextual-tags .tag").allTextContents(),
+      ["clarification"],
+    );
+  } finally {
+    await browser.close();
+    await stopVoicebook(server.process);
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
