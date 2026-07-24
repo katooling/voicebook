@@ -89,7 +89,7 @@ envelopes, retry rules, and privacy boundaries.
   remain suggestions until the Voice Owner confirms Mixed.
 - Agent and Mixed messages never enter the Voice Core automatically.
 - The blind evaluation remains valid only if the Voice Owner does not watch
-  generation payloads or inspect its private evaluation file before finishing.
+  generation payloads or inspect its private workspace data before finishing.
 
 “Local” describes where Voicebook persists runtime data. Selected Slack content
 still passes through the configured Slack connector, and Codex processes
