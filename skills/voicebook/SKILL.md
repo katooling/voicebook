@@ -92,7 +92,7 @@ If the status is `missing` or `stale`, prepare a bounded snapshot:
 node --experimental-strip-types src/cli.ts profile prepare
 ```
 
-Derive a concise profile from only the returned `coreMessages`. Do not add Source Messages, surrounding Slack Context, Materials, pending Candidates, credentials, or facts that are not present in that snapshot. Voicebook performs no model call; Codex does this reasoning.
+Derive a concise profile from only the returned `coreMessages`, including their allowlisted ordered Material metadata when it demonstrates evidence-use patterns. Do not add Source Messages, surrounding Slack Context, attachment bytes, pending Candidates, credentials, or facts that are not present in that snapshot. Voicebook performs no model call; Codex does this reasoning.
 
 Submit the finished text with the exact `coreRevision` returned by `profile prepare`:
 

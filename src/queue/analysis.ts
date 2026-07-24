@@ -76,7 +76,6 @@ export function analyzeCandidate(candidate: Candidate): AnalyzedCandidate {
 export function suggestContextualTags(
   candidate: Pick<Candidate, "text" | "materials">,
 ): ContextualTag[] {
-  const lowerText = candidate.text.toLocaleLowerCase("en");
   const suggestedTags: ContextualTag[] = [];
 
   if (
