@@ -1,11 +1,13 @@
-import type { Candidate } from "../candidates/port.ts";
 import type { Material } from "../contracts.ts";
-import type { CoreMessage } from "../core/port.ts";
+import type { AnalyzedCandidate } from "../queue/analysis.ts";
+import type { TaggedCoreMessage } from "../queue/port.ts";
 
 export function renderInbox(input: {
-  candidates: Candidate[];
+  candidates: AnalyzedCandidate[];
   csrfToken: string;
   search: string;
+  mode: "suggested" | "search";
+  totalEligible?: number;
 }): string {
   const cards =
     input.candidates.length === 0
@@ -28,6 +30,14 @@ export function renderInbox(input: {
           <label for="inbox-search">Search Candidates</label>
           <div><input id="inbox-search" name="q" value="${escapeHtml(input.search)}"><button>Search</button></div>
         </form>
+        <section class="queue-heading">
+          <h2>${input.mode === "suggested" ? "Suggested Queue" : "Search results"}</h2>
+          ${
+            input.mode === "suggested"
+              ? `<p>Showing ${input.candidates.length} diverse suggestions from ${input.totalEligible ?? 0} eligible Candidates.</p>`
+              : `<p>${input.candidates.length} matching Candidates.</p>`
+          }
+        </section>
         ${cards}
       </main>
     `,
@@ -35,7 +45,7 @@ export function renderInbox(input: {
 }
 
 export function renderCore(input: {
-  coreMessages: CoreMessage[];
+  coreMessages: TaggedCoreMessage[];
   csrfToken: string;
   search: string;
 }): string {
@@ -48,6 +58,19 @@ export function renderCore(input: {
               <article class="candidate">
                 ${message.pinned ? '<p class="eyebrow">Pinned</p>' : ""}
                 <p class="message">${escapeHtml(message.text)}</p>
+                <section class="contextual-tags">
+                  <h2>Contextual tags</h2>
+                  <p>${message.tags.length === 0 ? "No contextual tags." : message.tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join(" ")}</p>
+                  <form method="post" action="/core/${encodeURIComponent(message.id)}/tags">
+                    <input type="hidden" name="csrf" value="${escapeHtml(input.csrfToken)}">
+                    <label for="core-tags-${escapeHtml(message.id)}">Edit context</label>
+                    <div>
+                      <input id="core-tags-${escapeHtml(message.id)}" name="tags" value="${escapeHtml(message.tags.join(", "))}" aria-describedby="core-tags-help-${escapeHtml(message.id)}">
+                      <button type="submit">Save tags</button>
+                    </div>
+                    <small id="core-tags-help-${escapeHtml(message.id)}">Comma-separated contextual tags.</small>
+                  </form>
+                </section>
                 <div class="actions">
                   ${
                     message.pinned
@@ -87,7 +110,10 @@ export function renderCore(input: {
   );
 }
 
-function renderCandidate(candidate: Candidate, csrfToken: string): string {
+function renderCandidate(
+  candidate: AnalyzedCandidate,
+  csrfToken: string,
+): string {
   const context =
     candidate.context.length === 0
       ? "<p>No surrounding context was imported.</p>"
@@ -106,6 +132,26 @@ function renderCandidate(candidate: Candidate, csrfToken: string): string {
     <article class="candidate">
       <time datetime="${escapeHtml(candidate.publishedAt)}">${escapeHtml(formatDate(candidate.publishedAt))}</time>
       <p class="message">${escapeHtml(candidate.text)}</p>
+      ${
+        candidate.rankingReasons.length === 0
+          ? ""
+          : `<p class="ranking-reasons">${candidate.rankingReasons
+              .map(
+                (reason) =>
+                  `<span class="reason" data-ranking-reason="${escapeHtml(reason.tag)}">${escapeHtml(reason.label)}</span>`,
+              )
+              .join(" ")}</p>`
+      }
+      ${
+        candidate.suggestedTags.length === 0
+          ? ""
+          : `<p class="suggested-tags"><strong>Suggested tags:</strong> ${candidate.suggestedTags
+              .map(
+                (tag) =>
+                  `<span class="tag" data-suggested-tag="${escapeHtml(tag)}">${escapeHtml(tag)}</span>`,
+              )
+              .join(" ")}</p>`
+      }
       <section>
         <h2>Slack Context</h2>
         ${context}
@@ -174,10 +220,13 @@ function document(title: string, body: string): string {
     input { border: 1px solid #9dab9f; border-radius: .3rem; flex: 1; padding: .65rem; }
     button { background: #24513a; border: 0; border-radius: .3rem; color: white; cursor: pointer; padding: .65rem .9rem; }
     .candidate { background: white; border: 1px solid #d4dad5; border-radius: .5rem; margin: 1.25rem 0; padding: 1.3rem; }
+    .queue-heading { border-top: 0; margin-top: 1rem; }
     .message { font-size: 1.12rem; line-height: 1.55; white-space: pre-wrap; }
     section { border-top: 1px solid #e3e7e4; margin-top: 1rem; padding-top: .5rem; }
     section h2 { font-size: .85rem; letter-spacing: .08em; text-transform: uppercase; }
     .actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
+    .tag, .reason { background: #e8eee9; border-radius: 999px; display: inline-block; font-size: .8rem; margin: .15rem; padding: .25rem .55rem; }
+    .reason { background: #efe9db; }
     time { color: #66736b; font-size: .85rem; }
   </style>
 </head>

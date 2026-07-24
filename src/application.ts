@@ -5,20 +5,25 @@ import type { CoreApplication } from "./core/port.ts";
 import { openDatabase } from "./storage/database.ts";
 import type { SyncApplication } from "./sync/port.ts";
 import { SqliteSyncApplication } from "./sync/sqlite.ts";
+import type { QueueApplication } from "./queue/port.ts";
+import { SqliteQueueApplication } from "./queue/sqlite.ts";
 
 export type VoicebookApplication = {
   candidates: CandidateApplication;
   core: CoreApplication;
   sync: SyncApplication;
+  queue: QueueApplication;
   close(): void;
 };
 
 export function openVoicebook(workspace: string): VoicebookApplication {
   const database = openDatabase(workspace);
+  const candidates = new SqliteCandidateApplication(database);
   return {
-    candidates: new SqliteCandidateApplication(database),
+    candidates,
     core: new SqliteCoreApplication(database),
     sync: new SqliteSyncApplication(database),
+    queue: new SqliteQueueApplication(database, { candidates }),
     close: () => database.close(),
   };
 }

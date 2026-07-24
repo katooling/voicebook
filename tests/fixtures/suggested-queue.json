@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "sourceMessages": [
+    {
+      "sourceKey": "synthetic-queue:explanation",
+      "publishedAt": "2025-03-10T09:00:00.000Z",
+      "text": "Synthetic explanation candidate: the refresh completes before the cache entry becomes visible because the worker publishes its result in a later step. This means changing the request timeout would hide the ordering problem instead of resolving it.",
+      "context": [],
+      "materials": []
+    },
+    {
+      "sourceKey": "synthetic-queue:question",
+      "publishedAt": "2025-03-09T09:00:00.000Z",
+      "text": "Could we verify the synthetic callback marker before changing the worker configuration?",
+      "context": [],
+      "materials": []
+    },
+    {
+      "sourceKey": "synthetic-queue:disagreement",
+      "publishedAt": "2025-03-08T09:00:00.000Z",
+      "text": "I don't think the synthetic retry is the right fix. The evidence points to the handoff step, not the request step.",
+      "context": [],
+      "materials": []
+    },
+    {
+      "sourceKey": "synthetic-queue:link",
+      "publishedAt": "2025-03-07T09:00:00.000Z",
+      "text": "Synthetic reference details are available in the linked runbook.",
+      "context": [],
+      "materials": [
+        {
+          "ordinal": 1,
+          "kind": "link",
+          "role": "reference",
+          "label": "Synthetic runbook",
+          "url": "https://example.invalid/runbook/queue",
+          "sourceReference": "synthetic-link-queue"
+        }
+      ]
+    },
+    {
+      "sourceKey": "synthetic-queue:screenshots",
+      "publishedAt": "2025-03-06T09:00:00.000Z",
+      "text": "The first synthetic screenshot shows the completed request, while the second shows the missing callback.",
+      "context": [],
+      "materials": [
+        {
+          "ordinal": 1,
+          "kind": "image",
+          "role": "evidence",
+          "label": "Synthetic completed request",
+          "sourceReference": "synthetic-image-queue-1"
+        },
+        {
+          "ordinal": 2,
+          "kind": "image",
+          "role": "evidence",
+          "label": "Synthetic missing callback",
+          "sourceReference": "synthetic-image-queue-2"
+        }
+      ]
+    },
+    {
+      "sourceKey": "synthetic-queue:acknowledgement",
+      "publishedAt": "2025-03-05T09:00:00.000Z",
+      "text": "Sounds good",
+      "context": [],
+      "materials": []
+    },
+    {
+      "sourceKey": "synthetic-queue:logs",
+      "publishedAt": "2025-03-04T09:00:00.000Z",
+      "text": "2025-03-04T09:00:00Z INFO synthetic worker started\n2025-03-04T09:00:01Z ERROR synthetic callback missing\n    at syntheticWorker (worker.ts:12:3)",
+      "context": [],
+      "materials": []
+    },
+    {
+      "sourceKey": "synthetic-queue:code",
+      "publishedAt": "2025-03-03T09:00:00.000Z",
+      "text": "```ts\nconst syntheticResult = await runSyntheticWorker();\n```",
+      "context": [],
+      "materials": []
+    },
+    {
+      "sourceKey": "synthetic-queue:near-duplicate",
+      "publishedAt": "2025-03-02T09:00:00.000Z",
+      "text": "Could we verify the synthetic callback marker before we change the worker configuration?",
+      "context": [],
+      "materials": []
+    },
+    {
+      "sourceKey": "synthetic-queue:routine-update",
+      "publishedAt": "2025-03-01T09:00:00.000Z",
+      "text": "Please review the synthetic maintenance plan before tomorrow.",
+      "context": [],
+      "materials": []
+    }
+  ]
+}

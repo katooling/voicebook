@@ -17,6 +17,7 @@ import {
   isLocalHost,
   isLocalOrigin,
 } from "./security.ts";
+import { updateCoreTags } from "../queue/routes/update-core-tags.ts";
 
 export async function startReviewServer(input: {
   application: VoicebookApplication;
@@ -77,7 +78,7 @@ async function route(input: {
   if (input.request.method === "GET" && url.pathname === "/") {
     showInbox({
       ...input,
-      candidates: input.application.candidates,
+      queue: input.application.queue,
       url,
     });
     return;
@@ -86,6 +87,7 @@ async function route(input: {
     showCore({
       ...input,
       core: input.application.core,
+      queue: input.application.queue,
       url,
     });
     return;
@@ -122,6 +124,15 @@ async function route(input: {
         ...input,
         core: input.application.core,
         coreMessageId: decodeURIComponent(corePin[1]!),
+      });
+      return;
+    }
+    const coreTags = url.pathname.match(/^\/core\/([^/]+)\/tags$/);
+    if (coreTags) {
+      await updateCoreTags({
+        ...input,
+        queue: input.application.queue,
+        coreMessageId: decodeURIComponent(coreTags[1]!),
       });
       return;
     }
