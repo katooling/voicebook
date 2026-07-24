@@ -9,6 +9,7 @@ import type { SyncApplication } from "./sync/port.ts";
 import { SqliteSyncApplication } from "./sync/sqlite.ts";
 import type { QueueApplication } from "./queue/port.ts";
 import { SqliteQueueApplication } from "./queue/sqlite.ts";
+import { suggestContextualTags } from "./queue/analysis.ts";
 
 export type VoicebookApplication = {
   candidates: CandidateApplication;
@@ -21,7 +22,9 @@ export type VoicebookApplication = {
 
 export function openVoicebook(workspace: string): VoicebookApplication {
   const database = openDatabase(workspace);
-  const candidates = new SqliteCandidateApplication(database);
+  const candidates = new SqliteCandidateApplication(database, {
+    suggestTags: suggestContextualTags,
+  });
   return {
     candidates,
     core: new SqliteCoreApplication(database),

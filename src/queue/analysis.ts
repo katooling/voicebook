@@ -33,45 +33,7 @@ const reasonByTag: Record<ContextualTag, string> = {
 };
 
 export function analyzeCandidate(candidate: Candidate): AnalyzedCandidate {
-  const lowerText = candidate.text.toLocaleLowerCase("en");
-  const suggestedTags: ContextualTag[] = [];
-
-  if (
-    candidate.text.length >= 140 ||
-    /\b(because|therefore|this means)\b/i.test(candidate.text)
-  ) {
-    suggestedTags.push("explanation");
-  }
-  if (candidate.text.includes("?")) {
-    suggestedTags.push("question");
-  }
-  if (
-    /\b(i (?:do not|don't) think|not convinced|disagree|however)\b/i.test(
-      candidate.text,
-    )
-  ) {
-    suggestedTags.push("disagreement");
-  }
-  if (/\b(please|can you|could you|would you)\b/i.test(candidate.text)) {
-    suggestedTags.push("request");
-  }
-  if (
-    candidate.materials.some((material) => material.kind === "link") ||
-    /https?:\/\//i.test(candidate.text)
-  ) {
-    suggestedTags.push("link");
-  }
-  if (
-    candidate.materials.some(
-      (material) =>
-        material.kind === "image" &&
-        (material.role === "evidence" || material.role === "reference"),
-    ) ||
-    /\b(screenshot|image)\b/i.test(candidate.text)
-  ) {
-    suggestedTags.push("evidence");
-  }
-
+  const suggestedTags = suggestContextualTags(candidate);
   const acknowledgement =
     /^(thanks|thank you|got it|sounds good|ok|okay|sure|yep|yes|done|sgtm)[.!]?$/i.test(
       candidate.text.trim(),
@@ -111,8 +73,50 @@ export function analyzeCandidate(candidate: Candidate): AnalyzedCandidate {
   };
 }
 
-// These rules are contract-tested against migration 003's acceptance trigger.
-// After release, change them only with a new migration that replaces that trigger.
+export function suggestContextualTags(
+  candidate: Pick<Candidate, "text" | "materials">,
+): ContextualTag[] {
+  const lowerText = candidate.text.toLocaleLowerCase("en");
+  const suggestedTags: ContextualTag[] = [];
+
+  if (
+    candidate.text.length >= 140 ||
+    /\b(because|therefore|this means)\b/i.test(candidate.text)
+  ) {
+    suggestedTags.push("explanation");
+  }
+  if (candidate.text.includes("?")) {
+    suggestedTags.push("question");
+  }
+  if (
+    /\b(i (?:do not|don't) think|not convinced|disagree|however)\b/i.test(
+      candidate.text,
+    )
+  ) {
+    suggestedTags.push("disagreement");
+  }
+  if (/\b(please|can you|could you|would you)\b/i.test(candidate.text)) {
+    suggestedTags.push("request");
+  }
+  if (
+    candidate.materials.some((material) => material.kind === "link") ||
+    /https?:\/\//i.test(candidate.text)
+  ) {
+    suggestedTags.push("link");
+  }
+  if (
+    candidate.materials.some(
+      (material) =>
+        material.kind === "image" &&
+        (material.role === "evidence" || material.role === "reference"),
+    ) ||
+    /\b(screenshot|image)\b/i.test(candidate.text)
+  ) {
+    suggestedTags.push("evidence");
+  }
+
+  return suggestedTags;
+}
 
 export function normalizeTagInput(rawTags: string[]): string[] {
   const tags: string[] = [];

@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type {
   ImportEnvelope,
   ImportResult,
+  Material,
   NormalizedSourceMessage,
 } from "../contracts.ts";
 import type {
@@ -23,9 +24,22 @@ type StoredSource = {
 
 export class SqliteCandidateApplication implements CandidateApplication {
   readonly #database: DatabaseSync;
+  readonly #suggestTags: (input: {
+    text: string;
+    materials: Material[];
+  }) => readonly string[];
 
-  constructor(database: DatabaseSync) {
+  constructor(
+    database: DatabaseSync,
+    options: {
+      suggestTags: (input: {
+        text: string;
+        materials: Material[];
+      }) => readonly string[];
+    },
+  ) {
     this.#database = database;
+    this.#suggestTags = options.suggestTags;
   }
 
   import(envelope: ImportEnvelope): ImportResult {
@@ -151,16 +165,19 @@ export class SqliteCandidateApplication implements CandidateApplication {
       }
 
       if (decision === "accept" || decision === "pin") {
+        const materials = JSON.parse(source.materials_json) as Material[];
+        const tags = this.#suggestTags({ text: source.text, materials });
         this.#database
           .prepare(`
             INSERT INTO core_messages (
-              source_message_id, text, materials_json, pinned, accepted_at
-            ) VALUES (?, ?, ?, ?, ?)
+              source_message_id, text, materials_json, tags_json, pinned, accepted_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
           `)
           .run(
             source.id,
             source.text,
             source.materials_json,
+            JSON.stringify(tags),
             decision === "pin" ? 1 : 0,
             new Date().toISOString(),
           );

@@ -148,6 +148,56 @@ test("Core mutations make the profile stale and stale submission preserves the l
   }
 });
 
+test("correcting Core tags makes the profile stale until Codex refreshes it", async () => {
+  const workspace = await mkdtemp(join(tmpdir(), "voicebook-profile-tags-"));
+  importEnvelope(workspace, profileCandidates());
+  const server = await startVoicebook(workspace);
+  const browser = await chromium.launch({ headless: true });
+
+  try {
+    const page = await browser.newPage();
+    await page.goto(server.origin);
+    await acceptCandidate(page, "Synthetic accepted profile evidence.");
+    const initial = runProfile(workspace, ["prepare"]) as {
+      coreRevision: string;
+    };
+    submitProfile(
+      workspace,
+      initial.coreRevision,
+      "Synthetic profile before tag correction.",
+    );
+
+    await page.goto(`${server.origin}/core`);
+    await page.getByLabel("Edit context").fill("question, clarification");
+    await page.getByRole("button", { name: "Save tags" }).click();
+
+    const stale = runProfile(workspace, ["status"]) as ProfileStatus;
+    assert.equal(stale.status, "stale");
+    assert.equal(
+      stale.activeProfile?.text,
+      "Synthetic profile before tag correction.",
+    );
+
+    const refreshed = runProfile(workspace, ["prepare"]) as {
+      coreRevision: string;
+    };
+    const current = submitProfile(
+      workspace,
+      refreshed.coreRevision,
+      "Synthetic profile after tag correction.",
+    );
+    assert.equal(current.status, "current");
+    assert.equal(
+      current.activeProfile?.text,
+      "Synthetic profile after tag correction.",
+    );
+  } finally {
+    await browser.close();
+    await stopVoicebook(server.process);
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
 type ProfileStatus = {
   status: "missing" | "current" | "stale";
   coreRevision: string;
