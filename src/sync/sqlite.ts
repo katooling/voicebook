@@ -154,6 +154,10 @@ export class SqliteSyncApplication implements SyncApplication {
       }
 
       for (const message of page.sourceMessages) {
+        if (message.deleted) {
+          this.#applySourceMessage(page.syncKey, message, counts);
+          continue;
+        }
         if (
           !isIncluded(
             message,
@@ -274,7 +278,8 @@ export class SqliteSyncApplication implements SyncApplication {
       this.#database
         .prepare(`
           UPDATE source_messages
-          SET source_deleted = 1, revision = revision + 1, updated_at = ?,
+          SET text = '[deleted]', context_json = '[]', materials_json = '[]',
+              source_deleted = 1, revision = revision + 1, updated_at = ?,
               review_state = CASE
                 WHEN review_state = 'pending' THEN 'removed'
                 ELSE review_state

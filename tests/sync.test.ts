@@ -4,6 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { openVoicebook } from "../src/application.ts";
 import type { ImportEnvelope } from "../src/contracts.ts";
 import type {
   SyncPageEnvelope,
@@ -373,6 +374,164 @@ test("sync reconciles edits and explicit tombstones without deleting absent mess
       assert.doesNotMatch(html, /Synthetic edited message/);
     } finally {
       await stopVoicebook(server.process);
+    }
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("known tombstones bypass a later scope and purge pending content without changing Core snapshots", async () => {
+  const workspace = await mkdtemp(join(tmpdir(), "voicebook-sync-purge-"));
+  const pending = sourceMessage({
+    sourceKey: "synthetic:pending-purge",
+    text: "Synthetic pending private text.",
+  });
+  pending.context = [
+    {
+      position: "before",
+      authorLabel: "Synthetic private teammate",
+      text: "Synthetic private Context.",
+    },
+  ];
+  pending.materials = [
+    {
+      ordinal: 1,
+      kind: "image",
+      role: "evidence",
+      label: "Synthetic private Material",
+      sourceReference: "synthetic-private-source-reference",
+    },
+  ];
+  const accepted = sourceMessage({
+    sourceKey: "synthetic:accepted-purge",
+    text: "Synthetic accepted Core snapshot.",
+  });
+  accepted.materials = [
+    {
+      ordinal: 1,
+      kind: "link",
+      role: "reference",
+      sourceReference: "synthetic-accepted-source-reference",
+    },
+  ];
+
+  try {
+    runSync(workspace, syncPage({ sourceMessages: [pending, accepted] }));
+    const application = openVoicebook(workspace);
+    try {
+      const acceptedCandidate = application.candidates
+        .list()
+        .find((candidate) => candidate.text === accepted.text);
+      assert.ok(acceptedCandidate);
+      application.candidates.review(
+        acceptedCandidate.id,
+        acceptedCandidate.revision,
+        "accept",
+      );
+    } finally {
+      application.close();
+    }
+
+    const tombstoneScope = {
+      windowStart: "2026-01-01T00:00:00.000Z",
+      selectedConversationKeys: [],
+      optedInDirectMessageKeys: [],
+      excludedConversationKeys: ["synthetic-channel-selected"],
+    };
+    const receipt = runSync(
+      workspace,
+      syncPage({
+        pageKey: "synthetic-purge-generation-page",
+        scope: tombstoneScope,
+        sourceMessages: [
+          {
+            ...pending,
+            publishedAt: "2020-01-01T00:00:00.000Z",
+            deleted: true,
+            text: "",
+          },
+          {
+            ...accepted,
+            publishedAt: "2020-01-01T00:00:00.000Z",
+            deleted: true,
+            text: "",
+          },
+          {
+            ...sourceMessage({ sourceKey: "synthetic:unknown-purge" }),
+            publishedAt: "2020-01-01T00:00:00.000Z",
+            deleted: true,
+            text: "",
+          },
+        ],
+      }),
+    );
+    assert.equal(receipt.deleted, 2);
+    assert.equal(receipt.unchanged, 1);
+    assert.equal(receipt.excluded, 0);
+    assert.equal(receipt.outsideWindow, 0);
+
+    assert.deepEqual(
+      importEnvelope(workspace, {
+        schemaVersion: 1,
+        sourceMessages: [
+          {
+            sourceKey: pending.sourceKey,
+            publishedAt: pending.publishedAt,
+            text: "[deleted]",
+            context: [],
+            materials: [],
+          },
+          {
+            sourceKey: accepted.sourceKey,
+            publishedAt: accepted.publishedAt,
+            text: "[deleted]",
+            context: [],
+            materials: [],
+          },
+        ],
+      }),
+      { imported: 0, updated: 0, unchanged: 2 },
+    );
+
+    const afterDeletion = openVoicebook(workspace);
+    try {
+      assert.equal(afterDeletion.candidates.list().length, 0);
+      assert.deepEqual(
+        afterDeletion.core.search().map((message) => ({
+          text: message.text,
+          materials: message.materials,
+        })),
+        [
+          {
+            text: "Synthetic accepted Core snapshot.",
+            materials: accepted.materials,
+          },
+        ],
+      );
+    } finally {
+      afterDeletion.close();
+    }
+
+    const resurrection = sourceMessage({
+      sourceKey: pending.sourceKey,
+      text: "Synthetic resurrected pending message.",
+    });
+    const resurrectionReceipt = runSync(
+      workspace,
+      syncPage({
+        pageKey: "synthetic-resurrection-generation-page",
+        sourceMessages: [resurrection],
+      }),
+    );
+    assert.equal(resurrectionReceipt.updated, 1);
+    const resurrected = openVoicebook(workspace);
+    try {
+      assert.deepEqual(
+        resurrected.candidates.list().map((candidate) => candidate.text),
+        ["Synthetic resurrected pending message."],
+      );
+    } finally {
+      resurrected.close();
     }
   } finally {
     await rm(workspace, { recursive: true, force: true });
