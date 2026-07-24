@@ -32,6 +32,12 @@ test("later sync labels unmatched Source Messages Manual and one supported canon
     destination: "synthetic-channel",
     thread: "synthetic-thread",
   });
+  const formattedDraft =
+    "Could <@USYNTHETIC123|Synthetic Owner> review [the synthetic report](https://example.invalid/report?case=equivalent) before continuing?";
+  recordDraft(workspace, "synthetic-formatted-run", formattedDraft);
+  const displayNameDraft =
+    "Could @Synthetic Owner review the synthetic handoff before continuing?";
+  recordDraft(workspace, "synthetic-display-name-run", displayNameDraft);
   const publishedAt = soon();
   const page = syncPage("exact-page", [
     sourceMessage({
@@ -46,6 +52,18 @@ test("later sync labels unmatched Source Messages Manual and one supported canon
       publishedAt,
       text: "Synthetic manual update written in the normal workflow.",
     }),
+    sourceMessage({
+      sourceKey: "synthetic:origin:formatted-exact",
+      publishedAt,
+      text:
+        "Could <@USYNTHETIC123> review <https://example.invalid/report?case=equivalent|the synthetic report> before continuing?",
+    }),
+    sourceMessage({
+      sourceKey: "synthetic:origin:display-name",
+      publishedAt,
+      text:
+        "Could <@USYNTHETIC123> review the synthetic handoff before continuing?",
+    }),
   ]);
 
   try {
@@ -54,12 +72,22 @@ test("later sync labels unmatched Source Messages Manual and one supported canon
     const exact = originStatus(workspace, "synthetic:origin:exact");
     assert.equal(exact.origin, "agent");
     assert.equal(exact.rationale, "unique-supported-exact");
-    assert.equal(exact.canonicalizerVersion, "source-format-v2");
+    assert.equal(exact.canonicalizerVersion, "source-format-v3");
     assert.equal(exact.matcherVersion, "composition-v2");
 
     const manual = originStatus(workspace, "synthetic:origin:manual");
     assert.equal(manual.origin, "manual");
     assert.equal(manual.rationale, "no-plausible-draft");
+    assert.equal(
+      originStatus(workspace, "synthetic:origin:formatted-exact").origin,
+      "agent",
+      "equivalent stable mention and labelled-link wrappers must match",
+    );
+    assert.notEqual(
+      originStatus(workspace, "synthetic:origin:display-name").origin,
+      "agent",
+      "a display name must never be inferred to equal a stable mention ID",
+    );
 
     const server = await startVoicebook(workspace);
     const browser = await chromium.launch({ headless: true });
@@ -212,7 +240,7 @@ test("generic, duplicate, old, and contradictory matches never overclaim Voicebo
     "Please verify the synthetic old record before starting the operation.";
   recordDraft(workspace, "synthetic-old-record", oldDraft);
   const labelledLinkDraft =
-    "Please review <https://example.invalid/report|first synthetic report> before continuing.";
+    "Please review [first synthetic report](https://example.invalid/report) before continuing.";
   recordDraft(workspace, "synthetic-labelled-link", labelledLinkDraft);
   const futureDraft =
     "Please verify the synthetic causal ordering before starting the operation.";

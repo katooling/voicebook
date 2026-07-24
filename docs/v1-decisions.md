@@ -35,6 +35,7 @@
 
 - An unmatched Source Message is `manual` for Voicebook's purposes.
 - An exact canonical match with a Draft Record is automatically `agent`.
+- Source-format normalization equates labelled Slack and simple Markdown link wrappers only when both the exact URL and visible label remain the same. It equates Slack mention wrappers only when they retain the same stable member ID; display names are never inferred to identify that member.
 - A near match is suggested as `mixed` and requires Voice Owner confirmation.
 - Ambiguous matches remain `unknown`.
 - Composition Origin records Voicebook participation, not generalized AI detection.

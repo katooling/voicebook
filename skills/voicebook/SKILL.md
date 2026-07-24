@@ -64,7 +64,7 @@ Never pass raw connector payloads, attachment bytes, previews, OCR, tokens, cred
 
 Use the same stable conversation identifier for a Draft Run's `destination` and a synced Source Message's `conversation.key` when it is available. Do not compare display names with stable identifiers, derive a thread from `sourceKey`, or invent missing destination, thread, or Material metadata.
 
-Keep mention text exactly as the connector supplies it. Voicebook does not normalize mentions because a display name cannot be safely inferred to represent the same stable person identifier.
+Keep mention text exactly as the connector supplies it. Voicebook normalizes only Slack mention-wrapper variants that retain the same stable member ID, such as `<@USYNTHETIC123|Synthetic Owner>` and `<@USYNTHETIC123>`. It never infers that `@Display Name` represents a stable member ID. For labelled links, Voicebook treats Slack `<url|label>` and simple Markdown `[label](url)` wrappers as equivalent only while retaining the exact URL and visible label.
 
 Run from the Voicebook repository:
 

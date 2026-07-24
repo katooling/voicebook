@@ -126,7 +126,7 @@ A later synchronization compares Source Messages with recent Draft Records. Exac
 - Codex records the exact proposal as a Draft Record associated with the Draft Run.
 - The Voice Owner manually copies or edits the proposal and sends it through normal Slack.
 - Synchronization compares Source Messages with eligible recent Draft Records using author, time, destination or thread when known, Material shape, and text.
-- Exact matching uses deterministic canonicalization for harmless whitespace, Unicode, mention, link, and source-format differences.
+- Exact matching uses deterministic canonicalization for harmless whitespace, Unicode, and source-format differences. Mention-wrapper variants match only when they retain the same stable member ID. Labelled link wrappers match only when they retain both the exact URL and visible label; display-name identity is never inferred.
 - Exact canonical matches are automatically classified as `agent`.
 - Near matches are surfaced as `mixed` suggestions and require explicit confirmation.
 - Unmatched messages are classified as `manual` for Voicebook's purposes; ambiguous cases remain `unknown`.
