@@ -77,6 +77,8 @@ test("manual export is deterministic, private, portable, and excludes operationa
       "FORBIDDEN_SOURCE_REFERENCE",
       "FORBIDDEN_ATTACHMENT_BYTES",
       "FORBIDDEN_CREDENTIAL",
+      "FORBIDDEN_DRAFT_OBJECTIVE",
+      "FORBIDDEN_DRAFT_PROPOSAL",
       "source_key",
       "voice_core_state",
       "Draft Run",
@@ -188,6 +190,19 @@ async function prepareVoicebook(workspace: string): Promise<void> {
     },
   );
   assert.equal(submitted.status, 0, submitted.stderr);
+
+  const started = runDraft(workspace, "start", {
+    schemaVersion: 1,
+    requestKey: "synthetic-export-private-boundary",
+    objective: "FORBIDDEN_DRAFT_OBJECTIVE",
+    constraints: [],
+    currentMaterials: [],
+  }) as { runId: string };
+  runDraft(workspace, "finish", {
+    schemaVersion: 1,
+    runId: started.runId,
+    text: "FORBIDDEN_DRAFT_PROPOSAL",
+  });
 }
 
 function exportFixture(): ImportEnvelope {
@@ -271,6 +286,32 @@ function runProfile(
       workspace,
     ],
     { cwd: repositoryRoot, encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  return JSON.parse(result.stdout) as Record<string, unknown>;
+}
+
+function runDraft(
+  workspace: string,
+  operation: "start" | "finish",
+  input: Record<string, unknown>,
+): Record<string, unknown> {
+  const result = spawnSync(
+    process.execPath,
+    [
+      "--experimental-strip-types",
+      cliPath,
+      "draft",
+      operation,
+      "--workspace",
+      workspace,
+      "--stdin",
+    ],
+    {
+      cwd: repositoryRoot,
+      input: JSON.stringify(input),
+      encoding: "utf8",
+    },
   );
   assert.equal(result.status, 0, result.stderr);
   return JSON.parse(result.stdout) as Record<string, unknown>;
