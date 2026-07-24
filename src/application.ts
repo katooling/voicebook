@@ -17,7 +17,7 @@ import { SqliteDraftApplication } from "./drafting/sqlite.ts";
 import type { ReconciliationApplication } from "./reconciliation/port.ts";
 import { SqliteReconciliationApplication } from "./reconciliation/sqlite.ts";
 import type { EvaluationApplication } from "./evaluation/port.ts";
-import { FileEvaluationApplication } from "./evaluation/file.ts";
+import { SqliteEvaluationApplication } from "./evaluation/sqlite.ts";
 
 export type VoicebookApplication = {
   candidates: CandidateApplication;
@@ -48,7 +48,7 @@ export function openVoicebook(workspace: string): VoicebookApplication {
     export: new SqliteExportApplication(database),
     drafting,
     reconciliation,
-    evaluation: new FileEvaluationApplication(workspace, drafting),
+    evaluation: new SqliteEvaluationApplication(database, drafting),
     close: () => database.close(),
   };
 }

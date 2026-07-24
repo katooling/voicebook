@@ -1,17 +1,5 @@
-import { createHash, randomUUID } from "node:crypto";
-import {
-  chmodSync,
-  closeSync,
-  existsSync,
-  fsyncSync,
-  mkdirSync,
-  openSync,
-  readFileSync,
-  renameSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs";
-import { join } from "node:path";
+import { createHash } from "node:crypto";
+import type { DatabaseSync } from "node:sqlite";
 import type { DraftApplication, DraftStartRequest } from "../drafting/port.ts";
 import type {
   EvaluationApplication,
@@ -45,21 +33,19 @@ type StoredEvaluation = {
   scenarios: StoredScenario[];
 };
 
-export class FileEvaluationApplication implements EvaluationApplication {
-  readonly #directory: string;
+export class SqliteEvaluationApplication implements EvaluationApplication {
+  readonly #database: DatabaseSync;
   readonly #drafting: DraftApplication;
 
-  constructor(workspace: string, drafting: DraftApplication) {
-    this.#directory = join(workspace, "evaluations");
+  constructor(database: DatabaseSync, drafting: DraftApplication) {
+    this.#database = database;
     this.#drafting = drafting;
   }
 
   create(definition: EvaluationDefinition): EvaluationView {
-    return this.#mutate(definition.evaluationKey, () => {
-      const path = this.#path(definition.evaluationKey);
+    return this.#mutate(definition.evaluationKey, (existing) => {
       const definitionHash = hash(JSON.stringify(definition));
-      if (existsSync(path)) {
-        const existing = this.#read(definition.evaluationKey);
+      if (existing) {
         if (existing.definitionHash !== definitionHash) {
           throw new Error(
             "This evaluationKey already identifies a different evaluation.",
@@ -92,23 +78,32 @@ export class FileEvaluationApplication implements EvaluationApplication {
     scenarioKey: string,
     variant: EvaluationVariant,
   ): string {
+    const snapshot = this.#read(evaluationKey);
+    if (snapshot.scenarios.some((scenario) => scenario.judgment)) {
+      throw new Error("An evaluation is sealed after judging begins.");
+    }
+    const snapshotScenario = findScenario(snapshot, scenarioKey);
+    const field =
+      variant === "baseline"
+        ? "baselineInstruction"
+        : "assistedInstruction";
+    if (snapshotScenario[field] !== undefined) {
+      return snapshotScenario[field];
+    }
+    const request = draftRequest(snapshot, snapshotScenario);
+    const prepared =
+      variant === "baseline"
+        ? this.#drafting.previewTask(request)
+        : this.#drafting.preview(request);
     return this.#mutate(evaluationKey, (state) => {
       const current = requiredState(state);
       if (current.scenarios.some((scenario) => scenario.judgment)) {
         throw new Error("An evaluation is sealed after judging begins.");
       }
       const scenario = findScenario(current, scenarioKey);
-      const field =
-        variant === "baseline"
-          ? "baselineInstruction"
-          : "assistedInstruction";
       let instruction = scenario[field];
       if (instruction === undefined) {
-        const request = draftRequest(current, scenario);
-        instruction =
-          variant === "baseline"
-            ? this.#drafting.previewTask(request)
-            : this.#drafting.preview(request);
+        instruction = prepared;
         scenario[field] = instruction;
         current.revision += 1;
       }
@@ -190,16 +185,16 @@ export class FileEvaluationApplication implements EvaluationApplication {
     });
   }
 
-  #path(evaluationKey: string): string {
-    return join(this.#directory, `${evaluationKey}.json`);
-  }
-
   #read(evaluationKey: string): StoredEvaluation {
-    const path = this.#path(evaluationKey);
-    if (!existsSync(path)) {
+    const row = this.#database
+      .prepare(
+        "SELECT state_json FROM evaluations WHERE evaluation_key = ?",
+      )
+      .get(evaluationKey) as { state_json: string } | undefined;
+    if (!row) {
       throw new Error("Evaluation was not found.");
     }
-    return JSON.parse(readFileSync(path, "utf8")) as StoredEvaluation;
+    return JSON.parse(row.state_json) as StoredEvaluation;
   }
 
   #mutate<T>(
@@ -208,56 +203,36 @@ export class FileEvaluationApplication implements EvaluationApplication {
       state?: StoredEvaluation,
     ) => { state: StoredEvaluation; value: T },
   ): T {
-    mkdirSync(this.#directory, { recursive: true, mode: 0o700 });
-    chmodSync(this.#directory, 0o700);
-    const lock = `${this.#path(evaluationKey)}.lock`;
-    let lockDescriptor: number | undefined;
+    this.#database.exec("BEGIN IMMEDIATE");
     try {
-      lockDescriptor = openSync(lock, "wx", 0o600);
-      const state = existsSync(this.#path(evaluationKey))
-        ? this.#read(evaluationKey)
+      const row = this.#database
+        .prepare(
+          "SELECT state_json FROM evaluations WHERE evaluation_key = ?",
+        )
+        .get(evaluationKey) as { state_json: string } | undefined;
+      const state = row
+        ? (JSON.parse(row.state_json) as StoredEvaluation)
         : undefined;
       const result = operation(state);
       this.#write(result.state);
+      this.#database.exec("COMMIT");
       return result.value;
     } catch (error) {
-      if (
-        error instanceof Error &&
-        "code" in error &&
-        error.code === "EEXIST"
-      ) {
-        throw new Error("Evaluation is busy. Retry the operation.");
-      }
+      this.#database.exec("ROLLBACK");
       throw error;
-    } finally {
-      if (lockDescriptor !== undefined) {
-        closeSync(lockDescriptor);
-        unlinkSync(lock);
-      }
     }
   }
 
   #write(state: StoredEvaluation): void {
-    const path = this.#path(state.evaluationKey);
-    const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
-    let descriptor: number | undefined;
-    try {
-      descriptor = openSync(temporary, "wx", 0o600);
-      writeFileSync(descriptor, `${JSON.stringify(state, null, 2)}\n`);
-      fsyncSync(descriptor);
-      closeSync(descriptor);
-      descriptor = undefined;
-      renameSync(temporary, path);
-      chmodSync(path, 0o600);
-    } catch (error) {
-      if (descriptor !== undefined) {
-        closeSync(descriptor);
-      }
-      if (existsSync(temporary)) {
-        unlinkSync(temporary);
-      }
-      throw error;
-    }
+    this.#database
+      .prepare(`
+        INSERT INTO evaluations (evaluation_key, revision, state_json)
+        VALUES (?, ?, ?)
+        ON CONFLICT(evaluation_key) DO UPDATE SET
+          revision = excluded.revision,
+          state_json = excluded.state_json
+      `)
+      .run(state.evaluationKey, state.revision, JSON.stringify(state));
   }
 }
 

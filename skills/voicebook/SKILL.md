@@ -197,4 +197,4 @@ node --experimental-strip-types src/cli.ts review
 
 Let the Voice Owner complete all ten neutral Side A/Side B comparisons. Report only the final revealed result. The evaluation passes when the assisted draft wins at least 7 of 10 voice choices and its mean clarity score is not below baseline.
 
-Blindness depends on the Voice Owner not watching generation commands or inspecting the private file under `workspace/evaluations/`. If that happens, create a new evaluation rather than treating the run as blind.
+Blindness depends on the Voice Owner not watching generation commands or inspecting private evaluation state in the local Voicebook database. If that happens, create a new evaluation rather than treating the run as blind.

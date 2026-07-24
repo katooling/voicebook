@@ -117,10 +117,12 @@ test("Codex can prepare and resume a concealed ten-scenario evaluation outside p
     });
     assert.doesNotMatch(JSON.stringify(restarted), /baseline|assisted|wins|clarity/i);
 
-    const evaluationDirectory = join(workspace, "evaluations");
-    const evaluationFile = join(evaluationDirectory, `${evaluationKey}.json`);
-    assert.equal((await stat(evaluationDirectory)).mode & 0o777, 0o700);
-    assert.equal((await stat(evaluationFile)).mode & 0o777, 0o600);
+    const evaluationFile = join(
+      workspace,
+      "evaluations",
+      `${evaluationKey}.json`,
+    );
+    await assert.rejects(stat(evaluationFile), { code: "ENOENT" });
     assert.equal(
       spawnSync("git", ["check-ignore", "-q", "evaluations/proof.json"], {
         cwd: repositoryRoot,
@@ -129,8 +131,8 @@ test("Codex can prepare and resume a concealed ten-scenario evaluation outside p
     );
 
     const database = await readFile(join(workspace, "voicebook.sqlite"), "utf8");
-    assert.doesNotMatch(database, /SYNTHETIC_(BASELINE|ASSISTED)_DRAFT/);
-    assert.doesNotMatch(database, /Synthetic situation/);
+    assert.match(database, /SYNTHETIC_(BASELINE|ASSISTED)_DRAFT/);
+    assert.match(database, /Synthetic situation/);
 
     const exported = runCli(workspace, ["export"]);
     assert.equal(exported.status, 0, exported.stderr);
@@ -140,6 +142,7 @@ test("Codex can prepare and resume a concealed ten-scenario evaluation outside p
     );
     assert.doesNotMatch(backup, /SYNTHETIC_(BASELINE|ASSISTED)_DRAFT/);
     assert.doesNotMatch(backup, /Synthetic situation/);
+    assert.doesNotMatch(backup, /voice-win-7-clarity-mean-v1/);
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
