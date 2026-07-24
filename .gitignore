@@ -1,0 +1,44 @@
+# Local Voicebook runtime state
+.voicebook/
+voicebook-data/
+runtime/
+previews/
+exports/
+evaluations/
+profile.md
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.sqlite3-*
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
+*.sqlite3-journal
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Logs and temporary files
+*.log
+.tmp/
+tmp/
+*.local
+
+# Common build output
+node_modules/
+dist/
+build/
+coverage/
+
+# Editor and operating-system files
+.DS_Store
+.idea/
+.vscode/
