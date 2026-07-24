@@ -1,6 +1,6 @@
 ---
 name: voicebook
-description: Synchronize selected Slack history into a local Voicebook and refresh its Voice Profile through Codex and the Voicebook CLI. Use when asked to seed, import, update, sync, resume, generate, or refresh Voicebook; this includes choosing Slack scope, importing only the Voice Owner's messages, and deriving a profile only from accepted Core Messages.
+description: Synchronize selected Slack history, refresh a Voice Profile, and ground an occasional Codex draft through the local Voicebook CLI. Use when asked to seed, import, sync, refresh, or draft with Voicebook; this includes importing only the Voice Owner's messages, deriving a profile only from accepted Core Messages, and recording a proposal without sending it.
 ---
 
 # Voicebook
@@ -109,3 +109,51 @@ node --experimental-strip-types src/cli.ts profile submit --stdin
 ```
 
 If submission reports `CORE_CHANGED`, discard the generated text, run `profile prepare` again, and regenerate from the new snapshot. A failed generation or submission leaves the previously saved profile usable. Never overwrite it with a profile based on an older Core revision.
+
+## Draft a message
+
+Before drafting, run `profile status`. If the profile is `missing` or `stale`, follow the refresh steps above first. If refresh fails but a stale profile remains, Voicebook can still use that last usable profile.
+
+Begin one Draft Run by passing the known situation through standard input:
+
+```bash
+node --experimental-strip-types src/cli.ts draft start --stdin
+```
+
+```json
+{
+  "schemaVersion": 1,
+  "requestKey": "stable-non-secret-request-key",
+  "objective": "Ask whether the copy is safe to run now.",
+  "audience": "Service on-call",
+  "situation": "A maintenance window may overlap the operation.",
+  "constraints": ["one clear question"],
+  "destination": "selected-channel",
+  "thread": "known-thread",
+  "currentMaterials": [
+    {
+      "kind": "image",
+      "role": "evidence",
+      "description": "Current screenshot showing the warning"
+    }
+  ]
+}
+```
+
+Omit optional fields that are unknown. Reuse `requestKey` only to retry the exact same input. Treat the returned `draftBrief` as one complete instruction: do not fetch Candidates or Slack Context, add other voice examples, or assemble a second prompt from Voicebook internals. Current Materials describe this situation; they are not voice evidence.
+
+Write one proposed Slack message in Codex. Then record its exact text, including line breaks:
+
+```bash
+node --experimental-strip-types src/cli.ts draft finish --stdin
+```
+
+```json
+{
+  "schemaVersion": 1,
+  "runId": "opaque-run-id-from-draft-start",
+  "text": "The exact proposed message."
+}
+```
+
+An exact retry returns the original receipt. Never submit different text to an already finished run. Voicebook does not send or edit Slack messages. Show the proposal to the Voice Owner and tell them to copy or edit it manually before sending through normal Slack.

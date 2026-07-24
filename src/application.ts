@@ -12,6 +12,8 @@ import { SqliteQueueApplication } from "./queue/sqlite.ts";
 import { suggestContextualTags } from "./queue/analysis.ts";
 import type { ExportApplication } from "./export/port.ts";
 import { SqliteExportApplication } from "./export/sqlite.ts";
+import type { DraftApplication } from "./drafting/port.ts";
+import { SqliteDraftApplication } from "./drafting/sqlite.ts";
 
 export type VoicebookApplication = {
   candidates: CandidateApplication;
@@ -20,6 +22,7 @@ export type VoicebookApplication = {
   sync: SyncApplication;
   queue: QueueApplication;
   export: ExportApplication;
+  drafting: DraftApplication;
   close(): void;
 };
 
@@ -35,6 +38,7 @@ export function openVoicebook(workspace: string): VoicebookApplication {
     sync: new SqliteSyncApplication(database),
     queue: new SqliteQueueApplication(database, { candidates }),
     export: new SqliteExportApplication(database),
+    drafting: new SqliteDraftApplication(database),
     close: () => database.close(),
   };
 }
