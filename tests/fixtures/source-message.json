@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "sourceMessages": [
+    {
+      "sourceKey": "synthetic-chat:work-room:message-001",
+      "publishedAt": "2025-02-03T09:30:00.000Z",
+      "text": "I think the second screenshot points to a different problem. The request completes in the first image, while the callback is missing in the second. Can we verify the callback logs before changing the request flow?",
+      "context": [
+        {
+          "position": "before",
+          "authorLabel": "Synthetic teammate",
+          "text": "Could the request flow be timing out?"
+        }
+      ],
+      "materials": [
+        {
+          "ordinal": 1,
+          "kind": "link",
+          "role": "reference",
+          "label": "Synthetic request trace",
+          "url": "https://example.invalid/traces/request-001",
+          "sourceReference": "synthetic-file-link-001"
+        },
+        {
+          "ordinal": 2,
+          "kind": "image",
+          "role": "evidence",
+          "label": "Completed request",
+          "sourceReference": "synthetic-image-001"
+        },
+        {
+          "ordinal": 3,
+          "kind": "image",
+          "role": "evidence",
+          "label": "Missing callback",
+          "sourceReference": "synthetic-image-002"
+        }
+      ]
+    }
+  ]
+}
