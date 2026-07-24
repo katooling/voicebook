@@ -1,0 +1,4 @@
+interface:
+  display_name: "Voicebook"
+  short_description: "Synchronize a local Voicebook from Slack"
+  default_prompt: "Use $voicebook to synchronize my selected Slack messages into my local Voicebook."

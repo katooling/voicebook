@@ -4,6 +4,7 @@ import { homedir, platform } from "node:os";
 import { join } from "node:path";
 import { runImportCommand } from "./commands/import.ts";
 import { runReviewCommand } from "./commands/review.ts";
+import { runSyncCommand } from "./commands/sync.ts";
 
 async function main(): Promise<void> {
   const [command, ...args] = process.argv.slice(2);
@@ -16,9 +17,12 @@ async function main(): Promise<void> {
     case "review":
       await runReviewCommand({ args, workspace });
       return;
+    case "sync":
+      await runSyncCommand({ args, workspace });
+      return;
     default:
       fail(
-        "Usage: voicebook <import|review> [--workspace PATH].",
+        "Usage: voicebook <import|review|sync> [--workspace PATH].",
       );
   }
 }
