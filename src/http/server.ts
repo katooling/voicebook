@@ -18,6 +18,7 @@ import {
   isLocalOrigin,
 } from "./security.ts";
 import { updateCoreTags } from "../queue/routes/update-core-tags.ts";
+import { confirmMixed } from "../reconciliation/routes/confirm-mixed.ts";
 
 export async function startReviewServer(input: {
   application: VoicebookApplication;
@@ -79,6 +80,7 @@ async function route(input: {
     showInbox({
       ...input,
       queue: input.application.queue,
+      reconciliation: input.application.reconciliation,
       url,
     });
     return;
@@ -101,6 +103,17 @@ async function route(input: {
     const candidateAction = url.pathname.match(
       /^\/candidates\/([^/]+)\/(accept|pin|reject|sensitive)$/,
     );
+    const mixedConfirmation = url.pathname.match(
+      /^\/composition-origin\/([^/]+)\/confirm-mixed$/,
+    );
+    if (mixedConfirmation) {
+      await confirmMixed({
+        ...input,
+        reconciliation: input.application.reconciliation,
+        sourceMessageId: decodeURIComponent(mixedConfirmation[1]!),
+      });
+      return;
+    }
     if (candidateAction) {
       await reviewCandidate({
         ...input,

@@ -14,6 +14,8 @@ import type { ExportApplication } from "./export/port.ts";
 import { SqliteExportApplication } from "./export/sqlite.ts";
 import type { DraftApplication } from "./drafting/port.ts";
 import { SqliteDraftApplication } from "./drafting/sqlite.ts";
+import type { ReconciliationApplication } from "./reconciliation/port.ts";
+import { SqliteReconciliationApplication } from "./reconciliation/sqlite.ts";
 
 export type VoicebookApplication = {
   candidates: CandidateApplication;
@@ -23,6 +25,7 @@ export type VoicebookApplication = {
   queue: QueueApplication;
   export: ExportApplication;
   drafting: DraftApplication;
+  reconciliation: ReconciliationApplication;
   close(): void;
 };
 
@@ -31,14 +34,16 @@ export function openVoicebook(workspace: string): VoicebookApplication {
   const candidates = new SqliteCandidateApplication(database, {
     suggestTags: suggestContextualTags,
   });
+  const reconciliation = new SqliteReconciliationApplication(database);
   return {
     candidates,
     core: new SqliteCoreApplication(database),
     profile: new SqliteProfileApplication(database),
-    sync: new SqliteSyncApplication(database),
+    sync: new SqliteSyncApplication(database, reconciliation),
     queue: new SqliteQueueApplication(database, { candidates }),
     export: new SqliteExportApplication(database),
     drafting: new SqliteDraftApplication(database),
+    reconciliation,
     close: () => database.close(),
   };
 }

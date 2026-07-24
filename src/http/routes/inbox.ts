@@ -1,11 +1,13 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { QueueApplication } from "../../queue/port.ts";
 import { renderInbox } from "../html.ts";
+import type { ReconciliationApplication } from "../../reconciliation/port.ts";
 
 export function showInbox(input: {
   request: IncomingMessage;
   response: ServerResponse;
   queue: QueueApplication;
+  reconciliation: ReconciliationApplication;
   csrfToken: string;
   url: URL;
 }): void {
@@ -20,6 +22,7 @@ export function showInbox(input: {
         };
   const html = renderInbox({
     ...result,
+    candidates: input.reconciliation.withOrigins(result.candidates),
     csrfToken: input.csrfToken,
     search,
   });

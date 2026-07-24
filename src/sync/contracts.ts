@@ -9,6 +9,7 @@ export type SyncSourceMessage = {
   sourceKey: string;
   authorKey: string;
   conversation: SyncConversation;
+  threadKey?: string;
   publishedAt: string;
   deleted: boolean;
   text: string;

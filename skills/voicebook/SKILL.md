@@ -55,11 +55,14 @@ For each Source Message, send only:
 
 - `sourceKey`, `authorKey`, `publishedAt`, and optional `deleted: true`;
 - `conversation: { key, kind }`, where `kind` is `channel` or `directMessage`;
+- optional `threadKey` only when the connector provides a stable thread identifier comparable to the Draft Run's `thread`;
 - verbatim `text`;
 - `context` items containing only `position`, `authorLabel`, and `text`;
 - ordered `materials` containing only `ordinal`, `kind`, `role`, and optional `label`, `url`, or `sourceReference`.
 
 Never pass raw connector payloads, attachment bytes, previews, OCR, tokens, credentials, reactions, or unrelated profile data. Include a deletion only when the connector supplies an explicit tombstone for a Source Message already seen in this sync stream. Never infer deletion from absence.
+
+Use the same stable conversation identifier for a Draft Run's `destination` and a synced Source Message's `conversation.key` when it is available. Do not compare display names with stable identifiers, derive a thread from `sourceKey`, or invent missing destination, thread, or Material metadata.
 
 Run from the Voicebook repository:
 
@@ -77,6 +80,8 @@ Keep each encoded page below 4 MiB. Keep the same `pageKey` and exact normalized
 - Failure: do not skip ahead. Correct the page and retry from the same continuation.
 
 Report only aggregate receipt counts. Do not paste Source Messages, Slack Context, Materials, identifiers, or continuations into progress updates.
+
+Synchronization also updates Composition Origin. `manual` means that no plausible recent Voicebook Draft Record matched; it is not a claim about other tools. One supported exact source-format match may become `agent`. A near match remains `unknown` until the Voice Owner reviews the visible diff and confirms `mixed` in the local browser. Never confirm Mixed on the Voice Owner's behalf.
 
 ## Refresh the Voice Profile
 

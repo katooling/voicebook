@@ -85,6 +85,9 @@ function parseSourceMessage(value: unknown): SyncSourceMessage {
       key: text(conversation.key, "conversation.key"),
       kind,
     },
+    ...(message.threadKey === undefined
+      ? {}
+      : { threadKey: text(message.threadKey, "threadKey") }),
     publishedAt: isoDate(message.publishedAt, "publishedAt"),
     deleted,
     text: deleted ? optionalText(message.text) : text(message.text, "text"),

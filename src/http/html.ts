@@ -1,9 +1,11 @@
 import type { Material } from "../contracts.ts";
 import type { AnalyzedCandidate } from "../queue/analysis.ts";
 import type { TaggedCoreMessage } from "../queue/port.ts";
+import type { CandidateWithOrigin } from "../reconciliation/port.ts";
+import { renderCompositionOrigin } from "../reconciliation/html.ts";
 
 export function renderInbox(input: {
-  candidates: AnalyzedCandidate[];
+  candidates: Array<AnalyzedCandidate & CandidateWithOrigin>;
   csrfToken: string;
   search: string;
   mode: "suggested" | "search";
@@ -114,7 +116,7 @@ export function renderCore(input: {
 }
 
 function renderCandidate(
-  candidate: AnalyzedCandidate,
+  candidate: AnalyzedCandidate & CandidateWithOrigin,
   csrfToken: string,
 ): string {
   const context =
@@ -135,6 +137,7 @@ function renderCandidate(
     <article class="candidate">
       <time datetime="${escapeHtml(candidate.publishedAt)}">${escapeHtml(formatDate(candidate.publishedAt))}</time>
       <p class="message">${escapeHtml(candidate.text)}</p>
+      ${renderCompositionOrigin(candidate.compositionOrigin, csrfToken)}
       ${
         candidate.rankingReasons.length === 0
           ? ""

@@ -7,6 +7,7 @@ import type {
   SyncSourceMessage,
 } from "./contracts.ts";
 import type { SyncApplication } from "./port.ts";
+import type { ReconciliationApplication } from "../reconciliation/port.ts";
 
 type StoredRun = {
   voice_owner_author_key: string;
@@ -30,6 +31,7 @@ type StoredSource = {
   source_author_key: string | null;
   conversation_key: string | null;
   conversation_kind: string | null;
+  source_thread_key: string | null;
   source_deleted: number;
   source_sync_key: string | null;
   review_state: string;
@@ -37,9 +39,14 @@ type StoredSource = {
 
 export class SqliteSyncApplication implements SyncApplication {
   readonly #database: DatabaseSync;
+  readonly #reconciliation: ReconciliationApplication;
 
-  constructor(database: DatabaseSync) {
+  constructor(
+    database: DatabaseSync,
+    reconciliation: ReconciliationApplication,
+  ) {
     this.#database = database;
+    this.#reconciliation = reconciliation;
   }
 
   applyPage(page: SyncPageEnvelope): SyncReceipt {
@@ -260,7 +267,7 @@ export class SqliteSyncApplication implements SyncApplication {
       .prepare(`
         SELECT id, published_at, text, context_json, materials_json,
                source_author_key, conversation_key, conversation_kind,
-               source_deleted, source_sync_key, review_state
+               source_thread_key, source_deleted, source_sync_key, review_state
         FROM source_messages
         WHERE source_key = ?
       `)
@@ -288,6 +295,7 @@ export class SqliteSyncApplication implements SyncApplication {
         `)
         .run(new Date().toISOString(), existing.id);
       counts.deleted += 1;
+      this.#reconciliation.reconcileSourceMessage(existing.id);
       return;
     }
 
@@ -300,13 +308,13 @@ export class SqliteSyncApplication implements SyncApplication {
     const contextJson = JSON.stringify(message.context);
     const materialsJson = JSON.stringify(message.materials);
     if (!existing) {
-      this.#database
+      const inserted = this.#database
         .prepare(`
           INSERT INTO source_messages (
             source_key, published_at, text, context_json, materials_json,
             updated_at, source_author_key, conversation_key, conversation_kind,
-            source_deleted, source_sync_key
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+            source_thread_key, source_deleted, source_sync_key
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
         `)
         .run(
           message.sourceKey,
@@ -318,8 +326,12 @@ export class SqliteSyncApplication implements SyncApplication {
           message.authorKey,
           message.conversation.key,
           message.conversation.kind,
+          message.threadKey ?? null,
           syncKey,
         );
+      this.#reconciliation.reconcileSourceMessage(
+        Number(inserted.lastInsertRowid),
+      );
       counts.imported += 1;
       return;
     }
@@ -332,9 +344,11 @@ export class SqliteSyncApplication implements SyncApplication {
       existing.source_author_key === message.authorKey &&
       existing.conversation_key === message.conversation.key &&
       existing.conversation_kind === message.conversation.kind &&
+      existing.source_thread_key === (message.threadKey ?? null) &&
       existing.source_deleted === 0 &&
       existing.source_sync_key === syncKey
     ) {
+      this.#reconciliation.reconcileSourceMessage(existing.id);
       counts.unchanged += 1;
       return;
     }
@@ -344,7 +358,7 @@ export class SqliteSyncApplication implements SyncApplication {
         UPDATE source_messages
         SET published_at = ?, text = ?, context_json = ?, materials_json = ?,
             source_author_key = ?, conversation_key = ?, conversation_kind = ?,
-            source_deleted = 0, source_sync_key = ?,
+            source_thread_key = ?, source_deleted = 0, source_sync_key = ?,
             revision = revision + 1, updated_at = ?,
             review_state = CASE
               WHEN source_deleted = 1 AND review_state = 'removed' THEN 'pending'
@@ -360,10 +374,12 @@ export class SqliteSyncApplication implements SyncApplication {
         message.authorKey,
         message.conversation.key,
         message.conversation.kind,
+        message.threadKey ?? null,
         syncKey,
         new Date().toISOString(),
         existing.id,
       );
+    this.#reconciliation.reconcileSourceMessage(existing.id);
     counts.updated += 1;
   }
 }
