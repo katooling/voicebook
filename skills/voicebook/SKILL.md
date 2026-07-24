@@ -1,6 +1,6 @@
 ---
 name: voicebook
-description: Synchronize selected Slack history, refresh a Voice Profile, and ground an occasional Codex draft through the local Voicebook CLI. Use when asked to seed, import, sync, refresh, or draft with Voicebook; this includes importing only the Voice Owner's messages, deriving a profile only from accepted Core Messages, and recording a proposal without sending it.
+description: Synchronize selected Slack history, refresh a Voice Profile, ground an occasional Codex draft, and run a blind local voice evaluation through the Voicebook CLI. Use when asked to seed, import, sync, refresh, draft, or evaluate with Voicebook; this includes importing only the Voice Owner's messages, deriving a profile only from accepted Core Messages, recording a proposal without sending it, and comparing baseline with Voicebook-assisted drafts.
 ---
 
 # Voicebook
@@ -162,3 +162,37 @@ node --experimental-strip-types src/cli.ts draft finish --stdin
 ```
 
 An exact retry returns the original receipt. Never submit different text to an already finished run. Voicebook does not send or edit Slack messages. Show the proposal to the Voice Owner and tell them to copy or edit it manually before sending through normal Slack.
+
+## Run the blind evaluation
+
+Create one evaluation with exactly ten locally held scenarios:
+
+```bash
+node --experimental-strip-types src/cli.ts evaluate create --stdin
+```
+
+Pass `schemaVersion: 1`, a non-secret `evaluationKey`, a fresh random `seed`, and ten scenario objects using the Draft Run situation fields. Keep scenarios and command payloads local; never add them to the repository.
+
+For each scenario, use `evaluate prepare --stdin` once with `variant: "baseline"` and once with `variant: "assisted"`. Generate each draft in a fresh, isolated Codex context, then record it with `evaluate submit --stdin`. Give both contexts the complete returned instruction and nothing else. Do not let the baseline context see the Voice Profile, Core Messages, assisted instruction, or assisted output.
+
+```json
+{"schemaVersion":1,"evaluationKey":"opaque-run-key","scenarioKey":"scenario-1","variant":"baseline"}
+```
+
+Submit the same fields plus `"text": "the exact generated draft"`. Use neutral, non-secret scenario keys. Exact preparation and submission retries are idempotent; never replace a pinned instruction or recorded draft.
+
+The assisted preparation reuses Voicebook's production selector and Draft Brief renderer without recording an evaluation situation or proposal as a production Draft Run. Voicebook calls no model. During collection, do not show the Voice Owner either draft, its variant, or partial results.
+
+After all twenty drafts are recorded, start the normal review server and open:
+
+```bash
+node --experimental-strip-types src/cli.ts review
+```
+
+```text
+/evaluation?key=EVALUATION_KEY
+```
+
+Let the Voice Owner complete all ten neutral Side A/Side B comparisons. Report only the final revealed result. The evaluation passes when the assisted draft wins at least 7 of 10 voice choices and its mean clarity score is not below baseline.
+
+Blindness depends on the Voice Owner not watching generation commands or inspecting the private file under `workspace/evaluations/`. If that happens, create a new evaluation rather than treating the run as blind.

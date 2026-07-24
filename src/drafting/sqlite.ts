@@ -88,32 +88,8 @@ export class SqliteDraftApplication implements DraftApplication {
         };
       }
 
-      const coreRevision = this.#coreRevision();
-      const profile = this.#activeProfile();
-      if (!profile) {
-        throw new DraftOperationError(
-          "VOICE_PROFILE_MISSING",
-          "Generate a Voice Profile before beginning a Draft Run.",
-        );
-      }
-      const profileStatus =
-        profile.based_on_revision === coreRevision ? "current" : "stale";
-      const selectedCore = selectCore(
-        this.#coreMessages(),
-        request,
-      );
-      if (selectedCore.length === 0) {
-        throw new DraftOperationError(
-          "VOICE_CORE_EMPTY",
-          "Accept at least one Core Message before beginning a Draft Run.",
-        );
-      }
-      const brief = renderDraftBrief({
-        request,
-        profileText: profile.text,
-        profileStatus,
-        selectedCore,
-      });
+      const prepared = this.#prepareBrief(request);
+      const brief = prepared.brief;
       const runId = randomUUID();
       const createdAt = new Date().toISOString();
       this.#database
@@ -131,17 +107,29 @@ export class SqliteDraftApplication implements DraftApplication {
           requestHash,
           inputJson,
           brief,
-          coreRevision,
-          profile.id,
-          profileStatus,
-          profile.text,
-          profile.based_on_revision,
-          JSON.stringify(selectedCore),
+          prepared.coreRevision,
+          prepared.profile.id,
+          prepared.profileStatus,
+          prepared.profile.text,
+          prepared.profile.based_on_revision,
+          JSON.stringify(prepared.selectedCore),
           configurationVersion,
           createdAt,
         );
       this.#database.exec("COMMIT");
       return { runId, draftBrief: brief };
+    } catch (error) {
+      this.#database.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  preview(request: DraftStartRequest): string {
+    this.#database.exec("BEGIN");
+    try {
+      const brief = this.#prepareBrief(request).brief;
+      this.#database.exec("COMMIT");
+      return brief;
     } catch (error) {
       this.#database.exec("ROLLBACK");
       throw error;
@@ -238,6 +226,44 @@ export class SqliteDraftApplication implements DraftApplication {
         FROM core_messages
       `)
       .all() as unknown as StoredCore[];
+  }
+
+  #prepareBrief(request: DraftStartRequest): {
+    brief: string;
+    coreRevision: number;
+    profile: StoredProfile;
+    profileStatus: "current" | "stale";
+    selectedCore: SelectedCore[];
+  } {
+    const coreRevision = this.#coreRevision();
+    const profile = this.#activeProfile();
+    if (!profile) {
+      throw new DraftOperationError(
+        "VOICE_PROFILE_MISSING",
+        "Generate a Voice Profile before preparing a draft.",
+      );
+    }
+    const profileStatus =
+      profile.based_on_revision === coreRevision ? "current" : "stale";
+    const selectedCore = selectCore(this.#coreMessages(), request);
+    if (selectedCore.length === 0) {
+      throw new DraftOperationError(
+        "VOICE_CORE_EMPTY",
+        "Accept at least one Core Message before preparing a draft.",
+      );
+    }
+    return {
+      brief: renderDraftBrief({
+        request,
+        profileText: profile.text,
+        profileStatus,
+        selectedCore,
+      }),
+      coreRevision,
+      profile,
+      profileStatus,
+      selectedCore,
+    };
   }
 }
 

@@ -19,6 +19,10 @@ import {
 } from "./security.ts";
 import { updateCoreTags } from "../queue/routes/update-core-tags.ts";
 import { confirmMixed } from "../reconciliation/routes/confirm-mixed.ts";
+import {
+  judgeEvaluation,
+  showEvaluation,
+} from "../evaluation/routes.ts";
 
 export async function startReviewServer(input: {
   application: VoicebookApplication;
@@ -95,6 +99,14 @@ async function route(input: {
     });
     return;
   }
+  if (input.request.method === "GET" && url.pathname === "/evaluation") {
+    showEvaluation({
+      ...input,
+      evaluation: input.application.evaluation,
+      url,
+    });
+    return;
+  }
   if (input.request.method === "POST") {
     if (!hasTrustedPostOrigin(input.request, input.port)) {
       reject(input.response, 403, "State-changing requests require a trusted Origin.");
@@ -147,6 +159,17 @@ async function route(input: {
         ...input,
         queue: input.application.queue,
         coreMessageId: decodeURIComponent(coreTags[1]!),
+      });
+      return;
+    }
+    const evaluationJudgment = url.pathname.match(
+      /^\/evaluation\/([^/]+)\/judge$/,
+    );
+    if (evaluationJudgment) {
+      await judgeEvaluation({
+        ...input,
+        evaluation: input.application.evaluation,
+        evaluationKey: decodeURIComponent(evaluationJudgment[1]!),
       });
       return;
     }

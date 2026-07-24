@@ -9,6 +9,7 @@ import { runSyncCommand } from "./commands/sync.ts";
 import { runExportCommand } from "./commands/export.ts";
 import { runDraftCommand } from "./commands/draft.ts";
 import { runOriginCommand } from "./commands/origin.ts";
+import { runEvaluateCommand } from "./commands/evaluate.ts";
 
 async function main(): Promise<void> {
   const [command, ...args] = process.argv.slice(2);
@@ -17,6 +18,9 @@ async function main(): Promise<void> {
   switch (command) {
     case "draft":
       await runDraftCommand({ args, workspace });
+      return;
+    case "evaluate":
+      await runEvaluateCommand({ args, workspace });
       return;
     case "import":
       await runImportCommand({ args, workspace });
@@ -38,7 +42,7 @@ async function main(): Promise<void> {
       return;
     default:
       fail(
-        "Usage: voicebook <draft|export|import|origin|profile|review|sync> [--workspace PATH].",
+        "Usage: voicebook <draft|evaluate|export|import|origin|profile|review|sync> [--workspace PATH].",
       );
   }
 }
