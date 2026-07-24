@@ -64,6 +64,8 @@ Never pass raw connector payloads, attachment bytes, previews, OCR, tokens, cred
 
 Use the same stable conversation identifier for a Draft Run's `destination` and a synced Source Message's `conversation.key` when it is available. Do not compare display names with stable identifiers, derive a thread from `sourceKey`, or invent missing destination, thread, or Material metadata.
 
+Keep mention text exactly as the connector supplies it. Voicebook does not normalize mentions because a display name cannot be safely inferred to represent the same stable person identifier.
+
 Run from the Voicebook repository:
 
 ```bash

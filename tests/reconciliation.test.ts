@@ -21,6 +21,11 @@ import {
 
 test("later sync labels unmatched Source Messages Manual and one supported canonical match Agent", async () => {
   const workspace = await setupWorkspace("origin-exact");
+  assert.equal(
+    originStatus(workspace, "synthetic:origin-exact:core-seed").origin,
+    "unknown",
+    "a Source Message is not Manual until reconciliation actually finds no match",
+  );
   const exactDraft =
     "Could we verify the synthetic callback?\n\nEvidence: https://example.invalid/run?case=1";
   recordDraft(workspace, "synthetic-exact-run", exactDraft, {
@@ -49,8 +54,8 @@ test("later sync labels unmatched Source Messages Manual and one supported canon
     const exact = originStatus(workspace, "synthetic:origin:exact");
     assert.equal(exact.origin, "agent");
     assert.equal(exact.rationale, "unique-supported-exact");
-    assert.equal(exact.canonicalizerVersion, "source-format-v1");
-    assert.equal(exact.matcherVersion, "composition-v1");
+    assert.equal(exact.canonicalizerVersion, "source-format-v2");
+    assert.equal(exact.matcherVersion, "composition-v2");
 
     const manual = originStatus(workspace, "synthetic:origin:manual");
     assert.equal(manual.origin, "manual");
@@ -206,6 +211,12 @@ test("generic, duplicate, old, and contradictory matches never overclaim Voicebo
   const oldDraft =
     "Please verify the synthetic old record before starting the operation.";
   recordDraft(workspace, "synthetic-old-record", oldDraft);
+  const labelledLinkDraft =
+    "Please review <https://example.invalid/report|first synthetic report> before continuing.";
+  recordDraft(workspace, "synthetic-labelled-link", labelledLinkDraft);
+  const futureDraft =
+    "Please verify the synthetic causal ordering before starting the operation.";
+  recordDraft(workspace, "synthetic-future-record", futureDraft);
 
   try {
     runSync(
@@ -246,6 +257,17 @@ test("generic, duplicate, old, and contradictory matches never overclaim Voicebo
           publishedAt: new Date(Date.now() + 30 * 86_400_000).toISOString(),
           text: oldDraft,
         }),
+        sourceMessage({
+          sourceKey: "synthetic:origin:labelled-link",
+          publishedAt: soon(),
+          text:
+            "Please review <https://example.invalid/report|second synthetic report> before continuing.",
+        }),
+        sourceMessage({
+          sourceKey: "synthetic:origin:future-record",
+          publishedAt: new Date(Date.now() - 60_000).toISOString(),
+          text: futureDraft,
+        }),
       ]),
     );
 
@@ -269,6 +291,16 @@ test("generic, duplicate, old, and contradictory matches never overclaim Voicebo
       );
     }
     assert.equal(originStatus(workspace, "synthetic:origin:old").origin, "manual");
+    assert.notEqual(
+      originStatus(workspace, "synthetic:origin:labelled-link").origin,
+      "agent",
+      "different visible labels on the same URL must not collapse to an exact match",
+    );
+    assert.equal(
+      originStatus(workspace, "synthetic:origin:future-record").origin,
+      "manual",
+      "a Draft Record created after publication cannot cause the Source Message",
+    );
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }

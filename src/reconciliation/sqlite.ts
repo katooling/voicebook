@@ -10,13 +10,12 @@ import type {
 } from "./port.ts";
 import { OriginChangedError } from "./port.ts";
 
-export const matcherVersion = "composition-v1";
+export const matcherVersion = "composition-v2";
 const nearThreshold = 0.82;
 const ambiguityMargin = 0.08;
 const weakThreshold = 0.45;
 const maximumNearLength = 4_000;
 const recentDays = 14;
-const futureMinutes = 10;
 // Newest records win the bounded candidate-generation query. This keeps the
 // worst-case local comparison cost finite without changing stable tie-breaks.
 const maximumRecentDrafts = 200;
@@ -227,9 +226,7 @@ export class SqliteReconciliationApplication
   #eligibleDrafts(source: StoredSource): StoredDraft[] {
     const published = Date.parse(source.published_at);
     const earliest = new Date(published - recentDays * 86_400_000).toISOString();
-    const latest = new Date(
-      published + futureMinutes * 60_000,
-    ).toISOString();
+    const latest = new Date(published).toISOString();
     return this.#database
       .prepare(`
         SELECT records.run_id, records.proposal_text, records.recorded_at,

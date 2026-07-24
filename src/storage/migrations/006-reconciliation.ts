@@ -31,8 +31,8 @@ export const reconciliationMigration = {
       suggestion_revision, evidence_json, canonicalizer_version,
       matcher_version, analyzed_at
     )
-    SELECT id, revision, 'manual', 'historical-unmatched', 0, '[]',
-           'source-format-v1', 'composition-v1', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    SELECT id, revision, 'unknown', 'historical-unreconciled', 0, '[]',
+           'source-format-v2', 'composition-v2', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
     FROM source_messages;
 
     CREATE TRIGGER composition_origin_after_source_insert
@@ -43,8 +43,8 @@ export const reconciliationMigration = {
         suggestion_revision, evidence_json, canonicalizer_version,
         matcher_version, analyzed_at
       ) VALUES (
-        NEW.id, NEW.revision, 'manual', 'not-yet-reconciled', 0, '[]',
-        'source-format-v1', 'composition-v1',
+        NEW.id, NEW.revision, 'unknown', 'not-yet-reconciled', 0, '[]',
+        'source-format-v2', 'composition-v2',
         strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
       );
     END;
@@ -55,7 +55,7 @@ export const reconciliationMigration = {
     BEGIN
       UPDATE composition_origins
       SET source_revision = NEW.revision,
-          origin = 'manual',
+          origin = 'unknown',
           rationale = 'not-yet-reconciled',
           matched_draft_run_id = NULL,
           suggested_draft_run_id = NULL,
