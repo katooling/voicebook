@@ -38,6 +38,7 @@ export class DraftOperationError extends Error {
 
 export interface DraftApplication {
   begin(request: DraftStartRequest): DraftStartReceipt;
+  previewTask(request: DraftStartRequest): string;
   preview(request: DraftStartRequest): string;
   record(runId: string, text: string): DraftFinishReceipt;
 }

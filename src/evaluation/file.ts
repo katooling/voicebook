@@ -104,10 +104,11 @@ export class FileEvaluationApplication implements EvaluationApplication {
           : "assistedInstruction";
       let instruction = scenario[field];
       if (instruction === undefined) {
+        const request = draftRequest(current, scenario);
         instruction =
           variant === "baseline"
-            ? baselineInstruction(scenario)
-            : this.#drafting.preview(draftRequest(current, scenario));
+            ? this.#drafting.previewTask(request)
+            : this.#drafting.preview(request);
         scenario[field] = instruction;
         current.revision += 1;
       }
@@ -300,38 +301,6 @@ function draftRequest(
     ...(scenario.thread === undefined ? {} : { thread: scenario.thread }),
     currentMaterials: scenario.currentMaterials,
   };
-}
-
-function baselineInstruction(scenario: StoredScenario): string {
-  return [
-    "# Draft Task",
-    "",
-    "Write one clear proposed Slack message for this situation.",
-    "",
-    `Objective: ${scenario.objective}`,
-    ...(scenario.audience ? [`Audience: ${scenario.audience}`] : []),
-    ...(scenario.situation ? [`Situation: ${scenario.situation}`] : []),
-    ...(scenario.destination ? [`Destination: ${scenario.destination}`] : []),
-    ...(scenario.thread ? [`Thread: ${scenario.thread}`] : []),
-    ...(scenario.constraints.length
-      ? ["Constraints:", ...scenario.constraints.map((item) => `- ${item}`)]
-      : []),
-    ...(scenario.currentMaterials.length
-      ? [
-          "Current Materials:",
-          ...scenario.currentMaterials.map((material, index) =>
-            [
-              `- ${index + 1}.`,
-              material.kind,
-              material.role,
-              material.description,
-            ]
-              .filter(Boolean)
-              .join(" "),
-          ),
-        ]
-      : []),
-  ].join("\n");
 }
 
 function publicView(state: StoredEvaluation): EvaluationView {

@@ -56,6 +56,10 @@ test("Codex can prepare and resume a concealed ten-scenario evaluation outside p
       assert.equal(baseline.variant, "baseline");
       assert.match(baseline.instruction, new RegExp(`Synthetic situation ${index}`));
       assert.doesNotMatch(baseline.instruction, /Voice Profile|Core Messages/);
+      assert.match(
+        baseline.instruction,
+        /Improve accidental ambiguity, grammar, and unintended harshness\./,
+      );
 
       const assisted = runEvaluation(workspace, "prepare", {
         schemaVersion: 1,
@@ -66,6 +70,15 @@ test("Codex can prepare and resume a concealed ten-scenario evaluation outside p
       assert.equal(assisted.variant, "assisted");
       assert.match(assisted.instruction, /# Draft Brief/);
       assert.match(assisted.instruction, /Synthetic active profile/);
+      assert.equal(
+        assisted.instruction.startsWith(`${baseline.instruction}\n\n`),
+        true,
+        "assisted preparation must begin with the exact baseline task instruction",
+      );
+      assert.match(
+        assisted.instruction.slice(baseline.instruction.length),
+        /Voice Profile|Relevant Core Messages/,
+      );
 
       const baselineSubmission = runEvaluation(workspace, "submit", {
         schemaVersion: 1,

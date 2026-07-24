@@ -136,6 +136,10 @@ export class SqliteDraftApplication implements DraftApplication {
     }
   }
 
+  previewTask(request: DraftStartRequest): string {
+    return renderDraftTask(request);
+  }
+
   record(runId: string, text: string): DraftFinishReceipt {
     if (Buffer.byteLength(text, "utf8") > 128 * 1024) {
       throw new Error("Draft proposal is too large.");
@@ -398,29 +402,6 @@ function renderDraftBrief(input: {
   profileStatus: "current" | "stale";
   selectedCore: SelectedCore[];
 }): string {
-  const situation = [
-    field("Audience", input.request.audience),
-    field("Situation", input.request.situation),
-    field("Destination", input.request.destination),
-    field("Thread", input.request.thread),
-  ].filter((value): value is string => value !== null);
-  const constraints =
-    input.request.constraints.length === 0
-      ? ["- None supplied."]
-      : input.request.constraints.map(
-          (constraint) => `- ${inline(constraint)}`,
-        );
-  const currentMaterials =
-    input.request.currentMaterials.length === 0
-      ? ["- None supplied."]
-      : input.request.currentMaterials.map((material, index) => {
-          const details = [
-            material.kind,
-            material.role,
-            material.description,
-          ].filter(Boolean);
-          return `- ${index + 1}. ${details.map((value) => inline(value!)).join(" — ")}`;
-        });
   const examples = input.selectedCore.flatMap((message, index) => {
     const materialLines =
       message.materials.length === 0
@@ -445,13 +426,56 @@ function renderDraftBrief(input: {
   });
 
   return [
+    renderDraftTask(input.request),
+    "",
+    "## Voice Evidence",
+    "",
+    "Use the evidence below to preserve the demonstrated voice.",
+    "",
+    "## Voice Profile",
+    "",
+    `- Profile status: ${capitalize(input.profileStatus)}`,
+    "",
+    input.profileText,
+    "",
+    "## Relevant Core Messages",
+    "",
+    "Only the examples below are voice evidence for this Draft Run.",
+    "",
+    ...examples,
+  ].join("\n");
+}
+
+function renderDraftTask(request: DraftStartRequest): string {
+  const situation = [
+    field("Audience", request.audience),
+    field("Situation", request.situation),
+    field("Destination", request.destination),
+    field("Thread", request.thread),
+  ].filter((value): value is string => value !== null);
+  const constraints =
+    request.constraints.length === 0
+      ? ["- None supplied."]
+      : request.constraints.map((constraint) => `- ${inline(constraint)}`);
+  const currentMaterials =
+    request.currentMaterials.length === 0
+      ? ["- None supplied."]
+      : request.currentMaterials.map((material, index) => {
+          const details = [
+            material.kind,
+            material.role,
+            material.description,
+          ].filter(Boolean);
+          return `- ${index + 1}. ${details.map((value) => inline(value!)).join(" — ")}`;
+        });
+  return [
     "# Draft Brief",
     "",
-    "Write one proposed Slack message. Improve accidental ambiguity, grammar, and unintended harshness while preserving the demonstrated voice.",
+    "Write one proposed Slack message. Improve accidental ambiguity, grammar, and unintended harshness.",
     "",
     "## Objective",
     "",
-    input.request.objective,
+    request.objective,
     "",
     "## Situation",
     "",
@@ -466,18 +490,6 @@ function renderDraftBrief(input: {
     "These describe the current situation. They are not voice evidence.",
     "",
     ...currentMaterials,
-    "",
-    "## Voice Profile",
-    "",
-    `- Profile status: ${capitalize(input.profileStatus)}`,
-    "",
-    input.profileText,
-    "",
-    "## Relevant Core Messages",
-    "",
-    "Only the examples below are voice evidence for this Draft Run.",
-    "",
-    ...examples,
   ].join("\n");
 }
 
