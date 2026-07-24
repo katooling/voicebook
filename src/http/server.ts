@@ -88,6 +88,7 @@ async function route(input: {
       ...input,
       core: input.application.core,
       queue: input.application.queue,
+      profile: input.application.profile,
       url,
     });
     return;

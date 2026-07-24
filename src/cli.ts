@@ -3,6 +3,7 @@
 import { homedir, platform } from "node:os";
 import { join } from "node:path";
 import { runImportCommand } from "./commands/import.ts";
+import { runProfileCommand } from "./commands/profile.ts";
 import { runReviewCommand } from "./commands/review.ts";
 import { runSyncCommand } from "./commands/sync.ts";
 
@@ -17,12 +18,15 @@ async function main(): Promise<void> {
     case "review":
       await runReviewCommand({ args, workspace });
       return;
+    case "profile":
+      await runProfileCommand({ args, workspace });
+      return;
     case "sync":
       await runSyncCommand({ args, workspace });
       return;
     default:
       fail(
-        "Usage: voicebook <import|review|sync> [--workspace PATH].",
+        "Usage: voicebook <import|profile|review|sync> [--workspace PATH].",
       );
   }
 }

@@ -1,6 +1,6 @@
 ---
 name: voicebook
-description: Synchronize selected Slack history into a local Voicebook through Codex's connected Slack tools and the Voicebook CLI. Use when asked to seed, import, update, sync, or resume Voicebook from Slack; this includes choosing work channels, explicitly opting in direct-message conversations, excluding sensitive conversations, and importing only the Voice Owner's messages.
+description: Synchronize selected Slack history into a local Voicebook and refresh its Voice Profile through Codex and the Voicebook CLI. Use when asked to seed, import, update, sync, resume, generate, or refresh Voicebook; this includes choosing Slack scope, importing only the Voice Owner's messages, and deriving a profile only from accepted Core Messages.
 ---
 
 # Voicebook
@@ -77,3 +77,35 @@ Keep each encoded page below 4 MiB. Keep the same `pageKey` and exact normalized
 - Failure: do not skip ahead. Correct the page and retry from the same continuation.
 
 Report only aggregate receipt counts. Do not paste Source Messages, Slack Context, Materials, identifiers, or continuations into progress updates.
+
+## Refresh the Voice Profile
+
+Check whether the saved profile still reflects the accepted Core Messages:
+
+```bash
+node --experimental-strip-types src/cli.ts profile status
+```
+
+If the status is `missing` or `stale`, prepare a bounded snapshot:
+
+```bash
+node --experimental-strip-types src/cli.ts profile prepare
+```
+
+Derive a concise profile from only the returned `coreMessages`. Do not add Source Messages, surrounding Slack Context, Materials, pending Candidates, credentials, or facts that are not present in that snapshot. Voicebook performs no model call; Codex does this reasoning.
+
+Submit the finished text with the exact `coreRevision` returned by `profile prepare`:
+
+```bash
+node --experimental-strip-types src/cli.ts profile submit --stdin
+```
+
+```json
+{
+  "schemaVersion": 1,
+  "basisRevision": "7",
+  "text": "Concise description of the Voice Owner's demonstrated writing patterns."
+}
+```
+
+If submission reports `CORE_CHANGED`, discard the generated text, run `profile prepare` again, and regenerate from the new snapshot. A failed generation or submission leaves the previously saved profile usable. Never overwrite it with a profile based on an older Core revision.

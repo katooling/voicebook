@@ -46,6 +46,7 @@ export function renderInbox(input: {
 
 export function renderCore(input: {
   coreMessages: TaggedCoreMessage[];
+  profilePanel: string;
   csrfToken: string;
   search: string;
 }): string {
@@ -100,6 +101,7 @@ export function renderCore(input: {
         <nav><a href="/">Inbox</a><a aria-current="page" href="/core">Core</a></nav>
       </header>
       <main>
+        ${input.profilePanel}
         <form class="search" method="get" action="/core">
           <label for="core-search">Search Voice Core</label>
           <div><input id="core-search" name="q" value="${escapeHtml(input.search)}"><button>Search</button></div>
